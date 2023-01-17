@@ -185,9 +185,17 @@ impl Calculator {
     /// [`recipe.result()`]: /struct.Recipe.html#method.result
     /// [`.item()`]: /struct.Stack.html#method.item
     pub fn set_recipe(&mut self, recipe: Recipe) {
-        let name = recipe.result().item();
-        self.recipes.insert(name.to_string(), Rc::new(recipe));
-        self.calculate_steps()
+        self.add_recipes(vec![recipe]);
+    }
+
+    /// Sets the calculator to use the specified recipes for creating their results. If multiple
+    /// recipes produce the same item, the later recipe overrides the earlier one(s).
+    pub fn add_recipes(&mut self, recipes: Vec<Recipe>) {
+        for recipe in recipes {
+            let name = recipe.result().item();
+            self.recipes.insert(name.to_string(), Rc::new(recipe));
+        }
+        self.calculate_steps();
     }
 
     /// Sets the target for the calculator.
