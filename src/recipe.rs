@@ -113,7 +113,9 @@ mod tests {
                 ingredients: vec![Stack::new("Oak Log", 1)],
             },
         );
-        let actual = Recipe::nom_parse(ONE_LINE_NO_METHOD).unwrap();
+        let actual = Recipe::nom_parse("Crafting Table")
+            .parse(ONE_LINE_NO_METHOD)
+            .unwrap();
         assert_eq!(expected, actual);
     }
 
@@ -127,7 +129,9 @@ mod tests {
                 ingredients: vec![Stack::new("Oak Log", 1)],
             },
         );
-        let actual = Recipe::nom_parse(ONE_LINE_WITH_METHOD).unwrap();
+        let actual = Recipe::nom_parse("Crafting Table")
+            .parse(ONE_LINE_WITH_METHOD)
+            .unwrap();
         assert_eq!(expected, actual);
     }
 
@@ -141,7 +145,9 @@ mod tests {
                 ingredients: vec![Stack::new("Oak Wood Planks", 1), Stack::new("Stick", 2)],
             },
         );
-        let actual = Recipe::nom_parse(MULTI_LINE).unwrap();
+        let actual = Recipe::nom_parse("Crafting Table")
+            .parse(MULTI_LINE)
+            .unwrap();
         assert_eq!(expected, actual);
     }
 }
