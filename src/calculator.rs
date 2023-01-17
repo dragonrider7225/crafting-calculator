@@ -19,8 +19,13 @@ pub struct Calculator {
 }
 
 impl Calculator {
+    /// Creates a calculator that doesn't know about any recipes.
+    pub fn new() -> Self {
+        Self::with_recipes(HashMap::new())
+    }
+
     /// Creates a calculator that knows about the given recipes.
-    pub fn new(recipes: HashMap<String, Recipe>) -> Self {
+    pub fn with_recipes(recipes: HashMap<String, Recipe>) -> Self {
         Self {
             recipes: recipes
                 .into_iter()
@@ -201,6 +206,12 @@ impl Calculator {
     }
 }
 
+impl Default for Calculator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -215,7 +226,7 @@ mod tests {
             ),
             1,
         )];
-        let mut calculator = Calculator::new(HashMap::new());
+        let mut calculator = Calculator::new();
         calculator.set_target(Stack::new("Oak Log", 1));
         let actual = calculator.steps().collect::<Vec<_>>();
         assert_eq!(&expected[..], &actual[..]);
@@ -241,7 +252,7 @@ mod tests {
                 1,
             ),
         ];
-        let mut calculator = Calculator::new(HashMap::new());
+        let mut calculator = Calculator::new();
         calculator.set_recipe(Recipe::new(
             Stack::new("Charcoal", 1),
             "Furnace",
@@ -272,7 +283,7 @@ mod tests {
                 1,
             ),
         ];
-        let mut calculator = Calculator::new(HashMap::new());
+        let mut calculator = Calculator::new();
         calculator.set_recipe(Recipe::new(
             Stack::new("Oak Wood Planks", 4),
             "Crafting Table",
@@ -345,7 +356,7 @@ mod tests {
                 ),
             ),
         ];
-        let mut calculator = Calculator::new(HashMap::from(recipes));
+        let mut calculator = Calculator::with_recipes(HashMap::from(recipes));
         calculator.set_target(Stack::new("Wooden Shovel", 1));
         let actual = calculator.steps().collect::<Vec<_>>();
         assert_eq!(&expected[..], &actual[..]);
