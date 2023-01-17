@@ -48,6 +48,13 @@ impl Recipe {
     ) -> impl Parser<&str, Recipe, nom::error::Error<&str>> + '_ {
         RecipeParser { default_method }
     }
+
+    /// Parses a list of recipes separated by a blank line.
+    pub fn parse_recipes(
+        default_method: &str,
+    ) -> impl Parser<&str, Vec<Recipe>, nom::error::Error<&str>> + '_ {
+        multi::many0(Recipe::nom_parse(default_method))
+    }
 }
 
 struct RecipeParser<'d> {
