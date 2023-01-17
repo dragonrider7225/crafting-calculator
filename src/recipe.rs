@@ -43,21 +43,19 @@ impl Recipe {
 }
 
 impl Recipe {
-    pub(crate) fn nom_parse(
-        default_method: &str,
-    ) -> impl Parser<&str, Recipe, nom::error::Error<&str>> + '_ {
+    pub(crate) fn nom_parse(default_method: &str) -> RecipeParser<'_> {
         RecipeParser { default_method }
     }
 
     /// Parses a list of recipes separated by a blank line.
-    pub fn parse_recipes(
-        default_method: &str,
-    ) -> impl Parser<&str, Vec<Recipe>, nom::error::Error<&str>> + '_ {
-        multi::many0(Recipe::nom_parse(default_method))
+    pub fn parse_recipes(default_method: &str) -> RecipesParser<'_> {
+        RecipesParser { default_method }
     }
 }
 
-struct RecipeParser<'d> {
+/// A parser for a single recipe.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct RecipeParser<'d> {
     default_method: &'d str,
 }
 
@@ -99,6 +97,21 @@ where
                 ingredients,
             },
         )(s)
+    }
+}
+
+/// A parser for a list of recipes separated by blank lines.
+#[derive(Clone, Copy, Debug)]
+pub struct RecipesParser<'d> {
+    default_method: &'d str,
+}
+
+impl<'i, 'd> Parser<&'i str, Vec<Recipe>, nom::error::Error<&'i str>> for RecipesParser<'d>
+where
+    'd: 'i,
+{
+    fn parse(&mut self, s: &'i str) -> IResult<&'i str, Vec<Recipe>> {
+        multi::many0(Recipe::nom_parse(self.default_method))(s)
     }
 }
 
