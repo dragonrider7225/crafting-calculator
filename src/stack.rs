@@ -1,9 +1,3 @@
-use std::{
-    error::Error,
-    fmt::{self, Display, Formatter},
-    str::FromStr,
-};
-
 use nom::{
     bytes::complete as bytes, character::complete as character, combinator as comb, multi,
     sequence, IResult,
