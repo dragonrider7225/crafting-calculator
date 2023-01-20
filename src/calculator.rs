@@ -43,6 +43,19 @@ impl Calculator {
         &self.target
     }
 
+    /// Adds the given stack to the set of resources that are already available and do not need to
+    /// be crafted.
+    pub fn add_resource(&mut self, resource: Stack) {
+        match self.initial_materials.get_mut(resource.item()) {
+            Some(count) => *count += resource.count(),
+            None => {
+                self.initial_materials
+                    .insert(resource.item().to_string(), resource.count());
+            }
+        }
+        self.calculate_steps();
+    }
+
     fn calculate_steps(&mut self) {
         self.steps.clear();
         self.materials.clone_from(&self.initial_materials);
