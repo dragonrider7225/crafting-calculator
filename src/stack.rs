@@ -1,3 +1,8 @@
+use std::{
+    fmt::{self, Display, Formatter},
+    str::FromStr,
+};
+
 use nom::{
     bytes::complete as bytes, character::complete as character, combinator as comb, multi,
     sequence, IResult,
@@ -47,5 +52,24 @@ impl Stack {
                 count,
             },
         )(s)
+    }
+}
+
+impl Display for Stack {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{} ({})", self.item(), self.count())
+    }
+}
+
+impl FromStr for Stack {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use nom::Finish;
+
+        Self::nom_parse(s)
+            .finish()
+            .map(|(_, stack)| stack)
+            .map_err(|e| format!("Couldn't parse stack: {e:?}"))
     }
 }

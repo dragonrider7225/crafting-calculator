@@ -1,3 +1,5 @@
+use std::fmt::{self, Display, Formatter};
+
 use nom::{
     branch, bytes::complete as bytes, character::complete as character, combinator, multi,
     sequence, IResult, Parser,
@@ -50,6 +52,28 @@ impl Recipe {
     /// Parses a list of recipes separated by a blank line.
     pub fn parse_recipes(default_method: &str) -> RecipesParser<'_> {
         RecipesParser { default_method }
+    }
+}
+
+impl Display for Recipe {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let repeats = f.precision().unwrap_or(1);
+        writeln!(
+            f,
+            "{} ({}) ({}):",
+            self.result().item(),
+            self.result().count() * repeats,
+            self.method(),
+        )?;
+        for ingredient in self.ingredients() {
+            writeln!(
+                f,
+                "    {} ({})",
+                ingredient.item(),
+                ingredient.count() * repeats
+            )?;
+        }
+        Ok(())
     }
 }
 
