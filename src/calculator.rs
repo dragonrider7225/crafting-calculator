@@ -38,6 +38,11 @@ impl Calculator {
         }
     }
 
+    /// Gets the recipes that the calculator knows about.
+    pub fn recipes(&self) -> impl Iterator<Item = &Recipe> + '_ {
+        self.recipes.values().map(Rc::as_ref)
+    }
+
     /// Gets the calculator's current target.
     pub fn target(&self) -> &Stack {
         &self.target
