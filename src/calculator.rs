@@ -44,25 +44,15 @@ impl Calculator {
     }
 
     fn calculate_steps(&mut self) {
-        for (recipe, repeats) in self.steps.drain(..) {
-            if recipe.method() == "In Storage" {
-                let total_items = recipe.result().count() * repeats;
-                match self.initial_materials.get_mut(recipe.result().item()) {
-                    Some(unused) => *unused += total_items,
-                    None => {
-                        self.initial_materials
-                            .insert(recipe.result().item().to_string(), total_items);
-                    }
-                }
-            }
-        }
+        self.steps.clear();
+        self.materials.clone_from(&self.initial_materials);
         let mut to_craft = HashMap::new();
         to_craft.insert(self.target.item(), self.target.count());
         let mut craft_order = DoublePriorityQueue::new();
         craft_order.push(self.target.item(), 0);
         while let Some((next_craft, _)) = craft_order.pop_min() {
             if let Some(mut count) = to_craft.remove(next_craft) {
-                if let Some(available) = self.initial_materials.get_mut(next_craft) {
+                if let Some(available) = self.materials.get_mut(next_craft) {
                     let retrieved = (*available).min(count);
                     self.steps.push((
                         Rc::new(Recipe::new(
@@ -133,6 +123,28 @@ impl Calculator {
             let mut raw_materials = HashMap::new();
             for (step, repeats) in steps_to_check.drain(..) {
                 if step.method() != "Raw Material" {
+                    tmp.push((step, repeats));
+                    continue;
+                }
+                match raw_materials.get_mut(step.result().item()) {
+                    Some((_, cached_repeats)) => *cached_repeats += repeats,
+                    None => {
+                        raw_materials.insert(step.result().item().to_string(), (step, repeats));
+                    }
+                }
+            }
+            checked_steps.reserve(raw_materials.len());
+            for (result, action) in raw_materials {
+                checked_steps.push(action);
+                available_materials.insert(result);
+            }
+            steps_to_check.append(&mut tmp);
+        }
+        // Separate out the materials from storage
+        {
+            let mut raw_materials = HashMap::new();
+            for (step, repeats) in steps_to_check.drain(..) {
+                if step.method() != "In Storage" {
                     tmp.push((step, repeats));
                     continue;
                 }
