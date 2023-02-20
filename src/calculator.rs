@@ -83,11 +83,6 @@ impl Calculator {
                     *available -= retrieved;
                     count -= retrieved;
                 }
-                if let Some(available) = self.materials.get_mut(next_craft) {
-                    let retrieved = (*available).min(count);
-                    *available -= retrieved;
-                    count -= retrieved;
-                }
                 if count > 0 {
                     if let Some(recipe) = self.recipes.get(next_craft) {
                         let per_execution = recipe.result().count();
