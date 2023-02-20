@@ -116,7 +116,8 @@ impl Calculator {
                                 );
                             }
                             craft_order.push_increase(ingredient.item(), next_priority);
-                            *to_craft.entry(ingredient.item()).or_default() += ingredient.count();
+                            *to_craft.entry(ingredient.item()).or_default() +=
+                                ingredient.count() * repeats;
                         }
                     } else {
                         self.steps.push((
