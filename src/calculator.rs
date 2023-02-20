@@ -15,6 +15,7 @@ pub struct Calculator {
     target: Stack,
     initial_materials: HashMap<String, Count>,
     materials: HashMap<String, Count>,
+    crafted_materials: HashMap<String, Count>,
     steps: Vec<(Rc<Recipe>, Count)>,
 }
 
@@ -34,6 +35,7 @@ impl Calculator {
             target: Stack::new("Air", 1),
             initial_materials: Default::default(),
             materials: Default::default(),
+            crafted_materials: Default::default(),
             steps: Default::default(),
         }
     }
@@ -64,24 +66,32 @@ impl Calculator {
     fn calculate_steps(&mut self) {
         self.steps.clear();
         self.materials.clone_from(&self.initial_materials);
+        self.crafted_materials.clear();
         let mut to_craft = HashMap::new();
         to_craft.insert(self.target.item(), self.target.count());
         let mut craft_order = DoublePriorityQueue::new();
         craft_order.push(self.target.item(), 0);
         while let Some((next_craft, _)) = craft_order.pop_min() {
             if let Some(mut count) = to_craft.remove(next_craft) {
-                if let Some(available) = self.materials.get_mut(next_craft) {
+                if let Some(available) = self.crafted_materials.get_mut(next_craft) {
                     let retrieved = (*available).min(count);
-                    self.steps.push((
-                        Rc::new(Recipe::new(
-                            Stack::new(next_craft, 1),
-                            "In Storage",
-                            vec![Stack::new(next_craft, 1)],
-                        )),
-                        retrieved,
-                    ));
                     *available -= retrieved;
                     count -= retrieved;
+                }
+                if let Some(available) = self.materials.get_mut(next_craft) {
+                    let retrieved = (*available).min(count);
+                    if retrieved > 0 {
+                        self.steps.push((
+                            Rc::new(Recipe::new(
+                                Stack::new(next_craft, 1),
+                                "In Storage",
+                                vec![Stack::new(next_craft, 1)],
+                            )),
+                            retrieved,
+                        ));
+                        *available -= retrieved;
+                        count -= retrieved;
+                    }
                 }
                 if count > 0 {
                     if let Some(recipe) = self.recipes.get(next_craft) {
@@ -94,7 +104,8 @@ impl Calculator {
                             // We don't need to worry about overwriting an existing entry because
                             // that would require `*available > count` up above, which always makes
                             // `retrieved == count`.
-                            self.materials.insert(next_craft.to_string(), excess);
+                            self.crafted_materials
+                                .insert(next_craft.to_string(), excess);
                         }
                         for ingredient in recipe.ingredients() {
                             let next_priority = craft_order
@@ -130,6 +141,7 @@ impl Calculator {
         debug_assert!(to_craft.is_empty());
         let mut checked_steps = vec![];
         let mut available_materials = HashSet::new();
+        let mut from_storage = HashMap::new();
         let mut steps_to_check = mem::take(&mut self.steps);
         let mut tmp = vec![];
         // Separate out the raw materials
@@ -156,23 +168,17 @@ impl Calculator {
         }
         // Separate out the materials from storage
         {
-            let mut raw_materials = HashMap::new();
             for (step, repeats) in steps_to_check.drain(..) {
                 if step.method() != "In Storage" {
                     tmp.push((step, repeats));
                     continue;
                 }
-                match raw_materials.get_mut(step.result().item()) {
+                match from_storage.get_mut(step.result().item()) {
                     Some((_, cached_repeats)) => *cached_repeats += repeats,
                     None => {
-                        raw_materials.insert(step.result().item().to_string(), (step, repeats));
+                        from_storage.insert(step.result().item().to_string(), (step, repeats));
                     }
                 }
-            }
-            checked_steps.reserve(raw_materials.len());
-            for (result, action) in raw_materials {
-                checked_steps.push(action);
-                available_materials.insert(result);
             }
             steps_to_check.append(&mut tmp);
         }
@@ -181,13 +187,26 @@ impl Calculator {
         while !steps_to_check.is_empty() {
             let mut current_stage = HashMap::new();
             for (step, repeats) in steps_to_check.drain(..) {
-                if !step
-                    .ingredients()
-                    .iter()
-                    .all(|stack| available_materials.contains(stack.item()))
-                {
+                if !step.ingredients().iter().all(|stack| {
+                    available_materials.contains(stack.item())
+                        || from_storage
+                            .get(stack.item())
+                            .filter(|&&(ref recipe, rec_repeats)| {
+                                recipe.result().count() * rec_repeats >= stack.count() * repeats
+                            })
+                            .is_some()
+                }) {
                     tmp.push((step, repeats));
                     continue;
+                }
+                for stack in step.ingredients().iter() {
+                    match from_storage.remove_entry(stack.item()) {
+                        None => {}
+                        Some((item, (recipe, rec_repeats))) => {
+                            checked_steps.push((recipe, rec_repeats * repeats));
+                            available_materials.insert(item);
+                        }
+                    }
                 }
                 match current_stage.get_mut(step.result().item()) {
                     Some((_, cached_repeats)) => *cached_repeats += repeats,
@@ -392,6 +411,83 @@ mod tests {
         ];
         let mut calculator = Calculator::with_recipes(HashMap::from(recipes));
         calculator.set_target(Stack::new("Wooden Shovel", 1));
+        let actual = calculator.steps().collect::<Vec<_>>();
+        assert_eq!(&expected[..], &actual[..]);
+    }
+
+    #[test]
+    fn calculate_storage_use() {
+        let expected = [
+            (
+                &Recipe::new(
+                    Stack::new("Oak Log", 1),
+                    "Raw Material",
+                    vec![Stack::new("Oak Log", 1)],
+                ),
+                1,
+            ),
+            (
+                &Recipe::new(
+                    Stack::new("Oak Wood Planks", 4),
+                    "Crafting Table",
+                    vec![Stack::new("Oak Log", 1)],
+                ),
+                1,
+            ),
+            (
+                &Recipe::new(
+                    Stack::new("Stick", 4),
+                    "Crafting Table",
+                    vec![Stack::new("Oak Wood Planks", 2)],
+                ),
+                1,
+            ),
+            (
+                &Recipe::new(
+                    Stack::new("Stick", 1),
+                    "In Storage",
+                    vec![Stack::new("Stick", 1)],
+                ),
+                1,
+            ),
+            (
+                &Recipe::new(
+                    Stack::new("Wooden Shovel", 1),
+                    "Crafting Table",
+                    vec![Stack::new("Oak Wood Planks", 1), Stack::new("Stick", 2)],
+                ),
+                1,
+            ),
+        ];
+        let recipes = [
+            (
+                "Oak Wood Planks".to_string(),
+                Recipe::new(
+                    Stack::new("Oak Wood Planks", 4),
+                    "Crafting Table",
+                    vec![Stack::new("Oak Log", 1)],
+                ),
+            ),
+            (
+                "Stick".to_string(),
+                Recipe::new(
+                    Stack::new("Stick", 4),
+                    "Crafting Table",
+                    vec![Stack::new("Oak Wood Planks", 2)],
+                ),
+            ),
+            (
+                "Wooden Shovel".to_string(),
+                Recipe::new(
+                    Stack::new("Wooden Shovel", 1),
+                    "Crafting Table",
+                    vec![Stack::new("Oak Wood Planks", 1), Stack::new("Stick", 2)],
+                ),
+            ),
+        ];
+        let mut calculator = Calculator::with_recipes(HashMap::from(recipes));
+        calculator.set_target(Stack::new("Wooden Shovel", 1));
+        calculator.add_resource(Stack::new("Stick", 1));
         let actual = calculator.steps().collect::<Vec<_>>();
         assert_eq!(&expected[..], &actual[..]);
     }
