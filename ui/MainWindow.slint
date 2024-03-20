@@ -1,0 +1,50 @@
+import { Recipe as R, ItemCount, ItemStack } from "./Recipe.slint";
+import { Button, VerticalBox, HorizontalBox, ScrollView} from "std-widgets.slint";
+
+export struct Recipe {
+    result: ItemStack,
+    method: string,
+    ingredients: [ItemStack],
+}
+
+export component MainWindow inherits Window {
+    in property <ItemStack> result;
+    in property <[ItemStack]> ingredients;
+    in property <[Recipe]> steps;
+    callback set_target_clicked();
+    callback set_target();
+    preferred-width: 480px;
+    preferred-height: 360px;
+
+    ScrollView {
+        VerticalBox {
+            HorizontalBox {
+                vertical-stretch: 0;
+                Button {
+                    horizontal-stretch: 0;
+                    min-width: 0px;
+                    min-height: 0px;
+                    text: "Set Target";
+                    clicked => { root.set_target_clicked(); }
+                }
+                Text { horizontal-stretch: 1;}
+            }
+
+            ItemCount {
+                items <=> root.result;
+            }
+
+            for recipe in steps : Rectangle {
+                border-color: gray;
+                border-width: 2px;
+                R {
+                    result: recipe.result;
+                    method: recipe.method;
+                    ingredients: recipe.ingredients;
+                }
+            }
+
+            Text { vertical-stretch: 1; }
+        }
+    }
+}

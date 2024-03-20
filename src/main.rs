@@ -8,10 +8,90 @@
 use std::{
     fs::{File, OpenOptions},
     io::{self, Read, Write as IoWrite},
+    rc::Rc,
+    sync::RwLock,
 };
 
+use clap::Parser;
 use crafting_calculator::{Calculator, Recipe};
-use nom::Parser;
+
+#[cfg(feature = "gui")]
+#[allow(missing_docs)]
+#[allow(missing_debug_implementations)]
+mod gui {
+    use crafting_calculator::Stack;
+    use slint::{ModelRc, VecModel};
+
+    slint::slint! {
+        import { StandardButton, LineEdit } from "std-widgets.slint";
+
+        export component TargetDialog inherits Dialog {
+            out property <string> text <=> target.text;
+            callback cancel_clicked();
+            callback ok_clicked();
+            forward-focus: target;
+            FocusScope {
+                target := LineEdit {
+                    enabled: true;
+                    accepted => { root.ok_clicked(); }
+                }
+                key-pressed(event) => {
+                    if (event.text == Key.Escape) {
+                        root.cancel_clicked();
+                        accept
+                    } else if (event.text == Key.Return) {
+                        root.ok_clicked();
+                        accept
+                    } else {
+                        reject
+                    }
+                }
+            }
+
+            StandardButton { kind: cancel; }
+            StandardButton { kind: ok; }
+        }
+    }
+    impl TargetDialog {
+        pub fn real_new() -> Result<Self, slint::PlatformError> {
+            let this = Self::new()?;
+            let weak = this.as_weak();
+            this.on_cancel_clicked(move || weak.unwrap().window().hide().unwrap());
+            Ok(this)
+        }
+    }
+    slint::include_modules!();
+    impl From<Stack> for ItemStack {
+        fn from(value: Stack) -> Self {
+            Self {
+                count: value.count() as _,
+                name: value.item().into(),
+            }
+        }
+    }
+    impl From<&'_ Stack> for ItemStack {
+        fn from(value: &'_ Stack) -> Self {
+            Self {
+                count: value.count() as _,
+                name: value.item().into(),
+            }
+        }
+    }
+    pub fn mk_vec_model_rc<T: Clone + 'static>(v: Vec<T>) -> ModelRc<T> {
+        ModelRc::new(VecModel::from(v))
+    }
+}
+#[cfg(feature = "gui")]
+use gui::*;
+
+// This module exists to allow easy inspection of the transpiled `ui/MainWindow.slint`, which can
+// be found in `./target/<target>/crafting-calculator-<hash>/out/MainWindow.rs`.
+// #[cfg(feature = "gui")]
+// #[allow(missing_docs)]
+// #[allow(missing_debug_implementations)]
+// mod _gui {
+//     include!("../ui/MainWindow.rs");
+// }
 
 fn read_line() -> io::Result<String> {
     let mut line = String::new();
@@ -34,7 +114,7 @@ struct State {
     calculator: Calculator,
 }
 
-trait Command {
+trait Action {
     fn apply(&self, arguments: &str, state: &mut State);
     fn example(&self) -> &'static str;
     fn short_help(&self) -> &'static str;
@@ -46,7 +126,7 @@ trait Command {
 
 struct Help;
 
-impl Command for Help {
+impl Action for Help {
     fn apply(&self, arguments: &str, _state: &mut State) {
         if arguments.is_empty() {
             let max_width = COMMANDS
@@ -86,8 +166,10 @@ impl Command for Help {
 
 struct Load;
 
-impl Command for Load {
+impl Action for Load {
     fn apply(&self, arguments: &str, state: &mut State) {
+        use nom::Parser;
+
         let calculator = &mut state.calculator;
         let filename = arguments;
         let mut f = match File::open(filename) {
@@ -178,7 +260,7 @@ fn write_recipes(out: &mut dyn IoWrite, calculator: &mut Calculator) {
 
 struct Print;
 
-impl Command for Print {
+impl Action for Print {
     fn apply(&self, arguments: &str, state: &mut State) {
         match arguments {
             "steps" | "" => write_steps(&mut io::stdout().lock(), &mut state.calculator),
@@ -207,7 +289,7 @@ impl Command for Print {
 
 struct NewRecipe;
 
-impl Command for NewRecipe {
+impl Action for NewRecipe {
     fn apply(&self, _arguments: &str, state: &mut State) {
         let result = match prompt("Enter result (ex: Oak Planks (4))") {
             Ok(s) => match s.parse() {
@@ -265,7 +347,7 @@ impl Command for NewRecipe {
 
 struct Resource;
 
-impl Command for Resource {
+impl Action for Resource {
     fn apply(&self, arguments: &str, state: &mut State) {
         macro_rules! parse_resource {
             ($s:ident) => {
@@ -307,10 +389,10 @@ impl Command for Resource {
 
 struct Target;
 
-impl Command for Target {
+impl Action for Target {
     fn apply(&self, arguments: &str, state: &mut State) {
         if arguments.is_empty() {
-            println!("{}", state.calculator.target());
+            println!("Current target is {}", state.calculator.target());
             return;
         }
         let target = match arguments.parse() {
@@ -338,7 +420,7 @@ impl Command for Target {
 
 struct Write;
 
-impl Command for Write {
+impl Action for Write {
     fn apply(&self, arguments: &str, state: &mut State) {
         let open_file = |f| {
             OpenOptions::new()
@@ -400,7 +482,7 @@ impl Command for Write {
     }
 }
 
-const COMMANDS: &[(&str, &dyn Command)] = &[
+const COMMANDS: &[(&str, &dyn Action)] = &[
     ("help", &Help),
     ("load", &Load),
     ("print", &Print),
@@ -410,9 +492,7 @@ const COMMANDS: &[(&str, &dyn Command)] = &[
     ("write", &Write),
 ];
 
-fn cli() -> io::Result<()> {
-    let calculator = Calculator::new();
-    let mut state = State { calculator };
+fn cli(mut state: State) -> io::Result<()> {
     loop {
         print!("$ ");
         io::stdout().flush()?;
@@ -437,6 +517,101 @@ fn cli() -> io::Result<()> {
     }
 }
 
+#[derive(Parser, Debug)]
+struct Args {
+    #[arg(short, long)]
+    recipes: Vec<String>,
+    #[cfg(feature = "gui")]
+    #[arg(short = 'g', long)]
+    use_gui: bool,
+}
+
 fn main() -> io::Result<()> {
-    cli()
+    let args = Args::parse();
+    #[cfg(feature = "gui")]
+    let use_gui = args.use_gui;
+    #[cfg(not(feature = "gui"))]
+    let use_gui = false;
+    let mut state = State {
+        calculator: Calculator::new(),
+    };
+    for file in args.recipes {
+        Load.apply(&file, &mut state);
+    }
+    if use_gui {
+        #[cfg(feature = "gui")]
+        {
+            let main_window = MainWindow::new().unwrap();
+            let weak_main_window = main_window.as_weak();
+            let state = Rc::new(RwLock::new(state));
+            let weak_state = Rc::downgrade(&state);
+            main_window.on_set_target_clicked(move || {
+                let popup = TargetDialog::real_new().unwrap();
+                let weak_popup = popup.as_weak();
+                let weak_main_window = weak_main_window.clone();
+                let weak_state = weak_state.clone();
+                popup.on_ok_clicked(move || {
+                    Target.apply(
+                        &weak_popup.upgrade().unwrap().get_text(),
+                        &mut weak_state.upgrade().unwrap().write().unwrap(),
+                    );
+                    weak_popup.upgrade().unwrap().hide().unwrap();
+                    weak_main_window.upgrade().unwrap().invoke_set_target();
+                });
+                popup.show().unwrap();
+            });
+            let weak_main_window = main_window.as_weak();
+            let weak_state = Rc::downgrade(&state);
+            main_window.on_set_target(move || {
+                let state = weak_state.upgrade().unwrap();
+                let state = state.read().unwrap();
+                let result = state.calculator.target();
+                let main_window = weak_main_window.upgrade().unwrap();
+                main_window.set_result(result.into());
+                let steps = state
+                    .calculator
+                    .steps()
+                    .map(|(r, c)| {
+                        let result = r.result();
+                        let method = r.method();
+                        let ingredients = r.ingredients();
+                        gui::Recipe {
+                            result: ItemStack {
+                                name: result.item().into(),
+                                count: (result.count() * c) as _,
+                            },
+                            method: method.into(),
+                            ingredients: mk_vec_model_rc(
+                                ingredients
+                                    .iter()
+                                    .map(|stack| ItemStack {
+                                        name: stack.item().into(),
+                                        count: (stack.count() * c) as _,
+                                    })
+                                    .collect(),
+                            ),
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                main_window.set_steps(mk_vec_model_rc(steps));
+            });
+            // main_window.set_result(ItemStack {
+            //     count: 4,
+            //     name: "Oak Planks".into(),
+            // });
+            // main_window.set_ingredients(
+            //     [ItemStack {
+            //         count: 1,
+            //         name: "Oak Log".into(),
+            //     }]
+            //     .into(),
+            // );
+            main_window
+                .run()
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+        }
+    } else {
+        cli(state)?;
+    }
+    Ok(())
 }
