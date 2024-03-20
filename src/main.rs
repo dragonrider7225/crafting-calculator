@@ -141,11 +141,8 @@ fn write_steps(out: &mut dyn IoWrite, calculator: &mut Calculator) {
 }
 
 fn write_resources(out: &mut dyn IoWrite, calculator: &mut Calculator) {
-    for (recipe, count) in calculator
-        .steps()
-        .filter(|&(recipe, _)| recipe.method() == "Raw material")
-    {
-        match writeln!(out, "{} ({count})", recipe.result().item()) {
+    for stack in calculator.resources() {
+        match writeln!(out, "{}", stack) {
             Ok(_) => {}
             Err(e) => {
                 eprintln!("Couldn't write resources: {e:?}");
