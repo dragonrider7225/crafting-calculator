@@ -1,0 +1,44 @@
+import { VerticalBox, HorizontalBox } from "std-widgets.slint";
+
+export struct ItemStack {
+    name: string,
+    count: int,
+}
+
+export component ItemCount inherits HorizontalBox {
+    in property <ItemStack> items;
+    in property <int> indent_level;
+    spacing: 5px;
+    padding: 0px;
+    padding-left: (root.indent-level + 1) * 5px;
+    Text {
+        text: items.name + (items.count > 0 ? " x\{items.count}" : "");
+        min-width: 0px;
+    }
+}
+
+export component Recipe inherits VerticalBox {
+    in property <ItemStack> result;
+    in property <string> method;
+    in property <[ItemStack]> ingredients;
+    spacing: 5px;
+    padding: 0px;
+    padding-bottom: 5px;
+    vertical-stretch: 1;
+    HorizontalBox {
+        padding-left: 0px;
+        spacing: 0px;
+        ItemCount {
+            items: result;
+            indent-level: 0;
+        }
+        Text {
+            text: " (\{root.method})";
+        }
+        Text { horizontal-stretch: 1; }
+    }
+    for ingredient in ingredients : ItemCount {
+        indent-level: 1;
+        items: ingredient;
+    }
+}
