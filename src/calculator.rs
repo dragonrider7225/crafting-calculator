@@ -63,6 +63,15 @@ impl Calculator {
         self.calculate_steps();
     }
 
+    /// Gets an iterator over all the resources that have been added with [`self.add_resource()`].
+    ///
+    /// [`self.add_resource()`]: #method.add_resource
+    pub fn resources(&self) -> impl Iterator<Item = Stack> + '_ {
+        self.initial_materials
+            .iter()
+            .map(|(name, &count)| Stack::new(name, count))
+    }
+
     fn calculate_steps(&mut self) {
         self.steps.clear();
         self.materials.clone_from(&self.initial_materials);
