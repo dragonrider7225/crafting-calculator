@@ -13,27 +13,36 @@ use std::{
 };
 
 use clap::Parser;
-use crafting_calculator::{Calculator, Recipe};
+use crafting_calculator::{Calculator, Recipe, Stack};
 
 #[cfg(feature = "gui")]
 #[allow(missing_docs)]
 #[allow(missing_debug_implementations)]
 mod gui {
     use crafting_calculator::Stack;
-    use slint::{ModelRc, VecModel};
+    use slint::{Model, ModelRc, SharedString, VecModel};
 
     slint::slint! {
-        import { StandardButton, LineEdit } from "std-widgets.slint";
+        import { HorizontalBox, LineEdit, SpinBox, StandardButton } from "std-widgets.slint";
 
         export component TargetDialog inherits Dialog {
-            out property <string> text <=> target.text;
+            out property <string> item_name <=> name.text;
+            out property <int> item_count <=> count.value;
             callback cancel_clicked();
             callback ok_clicked();
-            forward-focus: target;
+            forward-focus: name;
             FocusScope {
-                target := LineEdit {
-                    enabled: true;
-                    accepted => { root.ok_clicked(); }
+                HorizontalBox {
+                    name := LineEdit {
+                        enabled: true;
+                        accepted => { root.ok_clicked(); }
+                    }
+                    count := SpinBox {
+                        enabled: true;
+                        minimum: 1;
+                        maximum: 2147483647;
+                        horizontal-stretch: 0;
+                    }
                 }
                 key-pressed(event) => {
                     if (event.text == Key.Escape) {
@@ -52,11 +61,144 @@ mod gui {
             StandardButton { kind: ok; }
         }
     }
+
+    slint::slint! {
+        import {
+            Button,
+            HorizontalBox,
+            LineEdit,
+            SpinBox,
+            StandardButton
+        } from "std-widgets.slint";
+
+        struct RItemCount {
+            name: string,
+            count: int,
+        }
+
+        export component RecipeDialog inherits Dialog {
+            out property <string> result_name <=> res_name.text;
+            out property <int> result_count <=> res_count.value;
+            out property <string> method <=> m.text;
+            in-out property <[RItemCount]> ingredients: [{ name: "", count: 0 }];
+            callback add_ingredient();
+            callback cancel_clicked();
+            callback ok_clicked();
+            forward-focus: res_name;
+            FocusScope {
+                VerticalLayout {
+                    HorizontalBox {
+                        res_name := LineEdit {
+                            enabled: true;
+                            accepted => { root.ok_clicked(); }
+                        }
+                        res_count := SpinBox {
+                            enabled: true;
+                            minimum: 1;
+                            maximum: 2147483647;
+                            horizontal-stretch: 0;
+                        }
+                    }
+                    m := LineEdit {
+                        enabled: true;
+                        accepted => { root.ok_clicked(); }
+                    }
+                    for ingredient[i] in ingredients : FocusScope {
+                        HorizontalBox {
+                            name := LineEdit {
+                                text: ingredient.name;
+                                enabled: true;
+                                edited(s) => { root.ingredients[i].name = s; }
+                                accepted => {
+                                    self.edited(self.text);
+                                    root.ok_clicked();
+                                }
+                            }
+                            count := SpinBox {
+                                value: ingredient.count;
+                                enabled: true;
+                                minimum: 1;
+                                maximum: 2147483647;
+                                edited(n) => { root.ingredients[i].count = n; }
+                                horizontal-stretch: 0;
+                            }
+                        }
+                        focus-changed-event => {
+                            name.edited(name.text);
+                            count.edited(count.value);
+                        }
+                    }
+                    Button {
+                        text: "+";
+                    }
+                    Text { vertical-stretch: 1; }
+                }
+                key-pressed(event) => {
+                    if (event.text == Key.Escape) {
+                        root.cancel_clicked();
+                        accept
+                    } else if (event.text == Key.Return) {
+                        root.ok_clicked();
+                        accept
+                    } else {
+                        reject
+                    }
+                }
+            }
+
+            StandardButton { kind: cancel; }
+            StandardButton { kind: ok; }
+        }
+    }
+
+    slint::slint! {
+        import { StandardButton } from "std-widgets.slint";
+
+        export component ErrorDialog inherits Dialog {
+            in property <string> message <=> msg.text;
+            callback ok_clicked();
+
+            msg := Text {}
+
+            StandardButton { kind: ok; }
+        }
+    }
+
     impl TargetDialog {
         pub fn real_new() -> Result<Self, slint::PlatformError> {
             let this = Self::new()?;
             let weak = this.as_weak();
             this.on_cancel_clicked(move || weak.unwrap().window().hide().unwrap());
+            Ok(this)
+        }
+    }
+    impl RecipeDialog {
+        pub fn real_new() -> Result<Self, slint::PlatformError> {
+            let this = Self::new()?;
+            let weak = this.as_weak();
+            this.on_cancel_clicked(move || weak.unwrap().window().hide().unwrap());
+            let weak = this.as_weak();
+            this.on_add_ingredient(move || {
+                let this = weak.unwrap();
+                let ingredients = VecModel::from(
+                    this.get_ingredients()
+                        .iter()
+                        .chain([RItemCount {
+                            name: SharedString::from(""),
+                            count: 0,
+                        }])
+                        .collect::<Vec<_>>(),
+                );
+                this.set_ingredients(ModelRc::new(ingredients));
+            });
+            Ok(this)
+        }
+    }
+    impl ErrorDialog {
+        pub fn real_new() -> Result<Self, slint::PlatformError> {
+            let this = Self::new()?;
+            let weak = this.as_weak();
+            this.on_ok_clicked(move || weak.unwrap().window().hide().unwrap());
             Ok(this)
         }
     }
@@ -551,11 +693,18 @@ fn main() -> io::Result<()> {
                 let weak_main_window = weak_main_window.clone();
                 let weak_state = weak_state.clone();
                 popup.on_ok_clicked(move || {
-                    Target.apply(
-                        &weak_popup.upgrade().unwrap().get_text(),
-                        &mut weak_state.upgrade().unwrap().write().unwrap(),
-                    );
-                    weak_popup.upgrade().unwrap().hide().unwrap();
+                    let popup = weak_popup.unwrap();
+                    weak_state
+                        .upgrade()
+                        .unwrap()
+                        .write()
+                        .unwrap()
+                        .calculator
+                        .set_target(Stack::new(
+                            popup.get_item_name(),
+                            popup.get_item_count() as _,
+                        ));
+                    popup.hide().unwrap();
                     weak_main_window.upgrade().unwrap().invoke_set_target();
                 });
                 popup.show().unwrap();
@@ -595,17 +744,34 @@ fn main() -> io::Result<()> {
                     .collect::<Vec<_>>();
                 main_window.set_steps(mk_vec_model_rc(steps));
             });
-            // main_window.set_result(ItemStack {
-            //     count: 4,
-            //     name: "Oak Planks".into(),
-            // });
-            // main_window.set_ingredients(
-            //     [ItemStack {
-            //         count: 1,
-            //         name: "Oak Log".into(),
-            //     }]
-            //     .into(),
-            // );
+            let weak_main_window = main_window.as_weak();
+            let weak_state = Rc::clone(&state);
+            main_window.on_add_recipe_clicked(move || {
+                let popup = RecipeDialog::real_new().unwrap();
+                let weak_popup = popup.as_weak();
+                let weak_main_window = weak_main_window.clone();
+                let weak_state = Rc::clone(&weak_state);
+                popup.on_ok_clicked(move || {
+                    use slint::Model;
+
+                    let popup = weak_popup.upgrade().unwrap();
+                    let result = Stack::new(popup.get_result_name(), popup.get_result_count() as _);
+                    let method = popup.get_method();
+                    let ingredients = popup
+                        .get_ingredients()
+                        .iter()
+                        .map(|s| Stack::new(s.name, s.count as _))
+                        .collect::<Vec<_>>();
+                    weak_state
+                        .write()
+                        .unwrap()
+                        .calculator
+                        .add_recipes(vec![Recipe::new(result, method, ingredients)]);
+                    weak_popup.upgrade().unwrap().hide().unwrap();
+                    weak_main_window.upgrade().unwrap().invoke_set_target();
+                });
+                popup.show().unwrap();
+            });
             main_window
                 .run()
                 .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;

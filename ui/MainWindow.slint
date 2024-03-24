@@ -11,6 +11,8 @@ export component MainWindow inherits Window {
     in property <ItemStack> result;
     in property <[ItemStack]> ingredients;
     in property <[Recipe]> steps;
+    callback add_recipe_clicked();
+    callback add_recipe();
     callback set_target_clicked();
     callback set_target();
     preferred-width: 480px;
@@ -26,6 +28,13 @@ export component MainWindow inherits Window {
                     min-height: 0px;
                     text: "Set Target";
                     clicked => { root.set_target_clicked(); }
+                }
+                Button {
+                    horizontal-stretch: 0;
+                    min-width: 0px;
+                    min-height: 0px;
+                    text: "Add Recipe";
+                    clicked => { root.add_recipe_clicked(); }
                 }
                 Text { horizontal-stretch: 1;}
             }
