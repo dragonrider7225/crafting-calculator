@@ -211,8 +211,8 @@ impl Calculator {
                 for stack in step.ingredients().iter() {
                     match from_storage.remove_entry(stack.item()) {
                         None => {}
-                        Some((item, (recipe, rec_repeats))) => {
-                            checked_steps.push((recipe, rec_repeats * repeats));
+                        Some((item, step)) => {
+                            checked_steps.push(step);
                             available_materials.insert(item);
                         }
                     }
