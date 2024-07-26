@@ -62,6 +62,7 @@ mod gui {
                 let popup = RecipeDialog::real_new(this_weak.clone(), weak_state.clone()).unwrap();
                 popup.show().unwrap();
             });
+            this.invoke_set_target();
             Ok(this)
         }
     }
