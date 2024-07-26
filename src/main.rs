@@ -47,7 +47,7 @@ mod gui {
                 let state = weak_state.upgrade().unwrap();
                 let state = state.read().unwrap();
                 let result = state.calculator.target();
-                let this = this_weak.upgrade().unwrap();
+                let this = this_weak.unwrap();
                 this.set_result(result.into());
                 let steps = state
                     .calculator
@@ -90,7 +90,7 @@ mod gui {
             });
             let this_weak = this.as_weak();
             this.on_ok_clicked(move || {
-                let this = this_weak.upgrade().unwrap();
+                let this = this_weak.unwrap();
                 let result = Stack::new(this.get_result_name(), this.get_result_count() as _);
                 let method = this.get_method();
                 let ingredients = this
@@ -99,15 +99,14 @@ mod gui {
                     .map(Stack::from)
                     .collect::<Vec<_>>();
                 state
-                    .clone()
                     .upgrade()
                     .unwrap()
                     .write()
                     .unwrap()
                     .calculator
                     .add_recipes(vec![crate::Recipe::new(result, method, ingredients)]);
-                this_weak.upgrade().unwrap().hide().unwrap();
-                main_window.clone().upgrade().unwrap().invoke_set_target();
+                this_weak.unwrap().hide().unwrap();
+                main_window.unwrap().invoke_set_target();
             });
             Ok(this)
         }
@@ -132,7 +131,7 @@ mod gui {
                     .calculator
                     .set_target(Stack::new(this.get_item_name(), this.get_item_count() as _));
                 this.hide().unwrap();
-                main_window.upgrade().unwrap().invoke_set_target();
+                main_window.unwrap().invoke_set_target();
             });
             Ok(this)
         }
