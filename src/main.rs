@@ -73,6 +73,8 @@ mod gui {
         ) -> Result<Self, slint::PlatformError> {
             let this = Self::new()?;
             let this_weak = this.as_weak();
+            this.on_cancel_clicked(move || this_weak.unwrap().hide().unwrap());
+            let this_weak = this.as_weak();
             this.on_add_ingredient(move || {
                 let this = this_weak.unwrap();
                 let ingredients = VecModel::from(
@@ -117,6 +119,8 @@ mod gui {
             state: rc::Weak<RwLock<State>>,
         ) -> Result<Self, slint::PlatformError> {
             let this = Self::new()?;
+            let weak_this = this.as_weak();
+            this.on_cancel_clicked(move || weak_this.unwrap().hide().unwrap());
             let weak_this = this.as_weak();
             this.on_ok_clicked(move || {
                 let this = weak_this.unwrap();

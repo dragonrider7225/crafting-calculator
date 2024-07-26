@@ -86,6 +86,12 @@ export component RecipeDialog inherits Dialog {
         }
     }
 
-    StandardButton { kind: cancel; }
-    StandardButton { kind: ok; }
+    StandardButton {
+        kind: cancel;
+        clicked => { root.cancel-clicked(); }
+    }
+    StandardButton {
+        kind: ok;
+        clicked => { root.ok-clicked(); }
+    }
 }
