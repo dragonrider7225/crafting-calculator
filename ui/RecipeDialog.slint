@@ -1,0 +1,76 @@
+import { Button, HorizontalBox, LineEdit, SpinBox, StandardButton } from "std-widgets.slint";
+import { ItemStack } from "./Recipe.slint";
+
+export component RecipeDialog inherits Dialog {
+    out property <string> result_name <=> res_name.text;
+    out property <int> result_count <=> res_count.value;
+    out property <string> method <=> m.text;
+    in-out property <[ItemStack]> ingredients: [{ name: "", count: 0 }];
+    callback add_ingredient();
+    callback cancel_clicked();
+    callback ok_clicked();
+    forward-focus: res_name;
+    FocusScope {
+        VerticalLayout {
+            HorizontalBox {
+                res_name := LineEdit {
+                    enabled: true;
+                    accepted => { root.ok_clicked(); }
+                }
+                res_count := SpinBox {
+                    enabled: true;
+                    minimum: 1;
+                    maximum: 2147483647;
+                    horizontal-stretch: 0;
+                }
+            }
+            m := LineEdit {
+                enabled: true;
+                accepted => { root.ok_clicked(); }
+            }
+            for ingredient[i] in ingredients : FocusScope {
+                HorizontalBox {
+                    name := LineEdit {
+                        text: ingredient.name;
+                        enabled: true;
+                        edited(s) => { root.ingredients[i].name = s; }
+                        accepted => {
+                            self.edited(self.text);
+                            root.ok_clicked();
+                        }
+                    }
+                    count := SpinBox {
+                        value: ingredient.count;
+                        enabled: true;
+                        minimum: 1;
+                        maximum: 2147483647;
+                        edited(n) => { root.ingredients[i].count = n; }
+                        horizontal-stretch: 0;
+                    }
+                }
+                focus-changed-event => {
+                    name.edited(name.text);
+                    count.edited(count.value);
+                }
+            }
+            Button {
+                text: "+";
+            }
+            Text { vertical-stretch: 1; }
+        }
+        key-pressed(event) => {
+            if (event.text == Key.Escape) {
+                root.cancel_clicked();
+                accept
+            } else if (event.text == Key.Return) {
+                root.ok_clicked();
+                accept
+            } else {
+                reject
+            }
+        }
+    }
+
+    StandardButton { kind: cancel; }
+    StandardButton { kind: ok; }
+}
