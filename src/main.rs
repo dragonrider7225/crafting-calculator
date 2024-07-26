@@ -124,6 +124,9 @@ mod gui {
             let weak_this = this.as_weak();
             this.on_ok_clicked(move || {
                 let this = weak_this.unwrap();
+                if this.get_item_name().trim().is_empty() {
+                    return;
+                }
                 state
                     .upgrade()
                     .unwrap()
