@@ -13,6 +13,10 @@ export component RecipeDialog inherits Dialog {
     FocusScope {
         VerticalLayout {
             HorizontalBox {
+                Text {
+                    text: "Result: ";
+                    vertical-alignment: center;
+                }
                 res_name := LineEdit {
                     enabled: true;
                     accepted => { root.ok_clicked(); }
@@ -24,12 +28,22 @@ export component RecipeDialog inherits Dialog {
                     horizontal-stretch: 0;
                 }
             }
-            m := LineEdit {
-                enabled: true;
-                accepted => { root.ok_clicked(); }
+            HorizontalBox {
+                Text {
+                    text: "Method: ";
+                    vertical-alignment: center;
+                }
+                m := LineEdit {
+                    enabled: true;
+                    accepted => { root.ok_clicked(); }
+                }
             }
             for ingredient[i] in ingredients : FocusScope {
                 HorizontalBox {
+                    Text {
+                        text: "Ingredient: ";
+                        vertical-alignment: center;
+                    }
                     name := LineEdit {
                         text: ingredient.name;
                         enabled: true;
