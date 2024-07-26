@@ -69,6 +69,7 @@ export component RecipeDialog inherits Dialog {
             }
             Button {
                 text: "+";
+                clicked => { root.add-ingredient(); }
             }
             Text { vertical-stretch: 1; }
         }
