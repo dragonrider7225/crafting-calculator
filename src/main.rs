@@ -28,6 +28,21 @@ mod gui {
 
     slint::include_modules!();
 
+    impl ErrorDialog {
+        pub(crate) fn real_new() -> Result<Self, slint::PlatformError> {
+            let this = Self::new()?;
+            let this_weak = this.as_weak();
+            this.on_ok_clicked(move || this_weak.unwrap().hide().unwrap());
+            Ok(this)
+        }
+
+        pub(crate) fn with_message(s: &str) -> Result<Self, slint::PlatformError> {
+            let this = Self::real_new()?;
+            this.set_message(s.into());
+            Ok(this)
+        }
+    }
+
     impl MainWindow {
         pub(crate) fn real_new(
             state: rc::Weak<RwLock<State>>,
