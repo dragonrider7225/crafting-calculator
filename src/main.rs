@@ -73,8 +73,10 @@ mod gui {
             });
             let this_weak = this.as_weak();
             this.on_add_recipe_clicked(move || {
-                let popup = RecipeDialog::real_new(this_weak.clone()).unwrap();
-                popup.show().unwrap();
+                RecipeDialog::real_new(this_weak.clone())
+                    .unwrap()
+                    .show()
+                    .unwrap();
             });
             let this_weak = this.as_weak();
             let weak_state = state.clone();
