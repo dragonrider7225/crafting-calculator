@@ -119,8 +119,34 @@ mod gui {
             let this_weak = this.as_weak();
             this.on_ok_clicked(move || {
                 let this = this_weak.unwrap();
+                let ingredients = this
+                    .get_ingredients()
+                    .iter()
+                    .filter(|ingredient| !ingredient.name.trim().is_empty() && ingredient.count > 0)
+                    .collect::<Vec<_>>();
+                if ingredients.is_empty() {
+                    ErrorDialog::with_message("Recipe must include at least one ingredient")
+                        .unwrap()
+                        .show()
+                        .unwrap();
+                    return;
+                }
+                if this.get_method().trim().is_empty() {
+                    ErrorDialog::with_message("Recipe must define a method")
+                        .unwrap()
+                        .show()
+                        .unwrap();
+                    return;
+                }
+                if this.get_result_name().trim().is_empty() || this.get_result_count() <= 0 {
+                    ErrorDialog::with_message("Recipe must have a result")
+                        .unwrap()
+                        .show()
+                        .unwrap();
+                    return;
+                }
                 main_window.unwrap().invoke_add_recipe(Recipe {
-                    ingredients: this.get_ingredients(),
+                    ingredients: mk_vec_model_rc(ingredients),
                     method: this.get_method(),
                     result: ItemStack {
                         name: this.get_result_name(),
