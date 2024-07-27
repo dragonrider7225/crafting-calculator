@@ -12,7 +12,7 @@ export component MainWindow inherits Window {
     in property <[ItemStack]> ingredients;
     in property <[Recipe]> steps;
     callback add_recipe_clicked();
-    callback add_recipe();
+    callback add_recipe(Recipe);
     callback set_target_clicked();
     callback set_target();
     preferred-width: 480px;

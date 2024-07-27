@@ -57,10 +57,21 @@ mod gui {
                 this.set_steps(mk_vec_model_rc(steps));
             });
             let this_weak = this.as_weak();
-            let weak_state = state.clone();
             this.on_add_recipe_clicked(move || {
-                let popup = RecipeDialog::real_new(this_weak.clone(), weak_state.clone()).unwrap();
+                let popup = RecipeDialog::real_new(this_weak.clone()).unwrap();
                 popup.show().unwrap();
+            });
+            let this_weak = this.as_weak();
+            let weak_state = state.clone();
+            this.on_add_recipe(move |recipe| {
+                weak_state
+                    .upgrade()
+                    .unwrap()
+                    .write()
+                    .unwrap()
+                    .calculator
+                    .add_recipes(vec![recipe.into()]);
+                this_weak.unwrap().invoke_set_target();
             });
             this.invoke_set_target();
             Ok(this)
@@ -70,7 +81,6 @@ mod gui {
     impl RecipeDialog {
         pub(crate) fn real_new(
             main_window: Weak<MainWindow>,
-            state: rc::Weak<RwLock<State>>,
         ) -> Result<Self, slint::PlatformError> {
             let this = Self::new()?;
             let this_weak = this.as_weak();
@@ -92,22 +102,15 @@ mod gui {
             let this_weak = this.as_weak();
             this.on_ok_clicked(move || {
                 let this = this_weak.unwrap();
-                let result = Stack::new(this.get_result_name(), this.get_result_count() as _);
-                let method = this.get_method();
-                let ingredients = this
-                    .get_ingredients()
-                    .iter()
-                    .map(Stack::from)
-                    .collect::<Vec<_>>();
-                state
-                    .upgrade()
-                    .unwrap()
-                    .write()
-                    .unwrap()
-                    .calculator
-                    .add_recipes(vec![crate::Recipe::new(result, method, ingredients)]);
+                main_window.unwrap().invoke_add_recipe(Recipe {
+                    ingredients: this.get_ingredients(),
+                    method: this.get_method(),
+                    result: ItemStack {
+                        name: this.get_result_name(),
+                        count: this.get_result_count(),
+                    },
+                });
                 this_weak.unwrap().hide().unwrap();
-                main_window.unwrap().invoke_set_target();
             });
             Ok(this)
         }
@@ -138,6 +141,28 @@ mod gui {
                 main_window.unwrap().invoke_set_target();
             });
             Ok(this)
+        }
+    }
+
+    impl From<crate::Recipe> for Recipe {
+        fn from(value: crate::Recipe) -> Self {
+            Self {
+                ingredients: mk_vec_model_rc(
+                    value.ingredients().iter().map(ItemStack::from).collect(),
+                ),
+                method: value.method().into(),
+                result: value.result().into(),
+            }
+        }
+    }
+
+    impl From<Recipe> for crate::Recipe {
+        fn from(value: Recipe) -> Self {
+            Self::new(
+                value.result.into(),
+                value.method,
+                value.ingredients.iter().map(Stack::from).collect(),
+            )
         }
     }
 
