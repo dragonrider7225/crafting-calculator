@@ -21,10 +21,12 @@ pub struct Stack {
 impl Stack {
     /// Makes a new stack of `name` containing `count` items.
     pub fn new(name: impl Into<String>, count: Count) -> Self {
-        Self {
-            name: name.into(),
-            count,
-        }
+        let mut name = name.into();
+        let end_whitespace_len = name.trim_end().len();
+        name.truncate(end_whitespace_len);
+        let start_whitespace_len = name.len() - name.trim_start().len();
+        name.replace_range(..start_whitespace_len, "");
+        Self { name, count }
     }
 }
 
