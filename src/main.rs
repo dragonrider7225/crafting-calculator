@@ -278,31 +278,64 @@ impl Command for Resource {
                 }
             };
         }
-        let resource = if arguments.is_empty() {
-            match prompt("Enter resource") {
-                Ok(s) => parse_resource!(s),
-                Err(e) => {
-                    eprintln!("Couldn't get resource: {e:?}");
-                    return;
-                }
+        let (method, resource) = match arguments.split_once(char::is_whitespace) {
+            Some(("add", stack)) => {
+                let stack = stack.trim();
+                (ResourceModifier::Add, parse_resource!(stack))
             }
-        } else {
-            parse_resource!(arguments)
+            Some(("remove", stack)) => {
+                let stack = stack.trim();
+                (ResourceModifier::Remove, parse_resource!(stack))
+            }
+            Some((method, _)) => {
+                eprintln!("Invalid method {method:?}");
+                return;
+            }
+            None => {
+                let method = match prompt("add/remove resource?").as_ref().map(|s| &**s) {
+                    Ok("add") => ResourceModifier::Add,
+                    Ok("remove") => ResourceModifier::Remove,
+                    Ok(method) => {
+                        eprintln!("Invalid method {method:?}");
+                        return;
+                    }
+                    Err(e) => {
+                        eprintln!("Couldn't get method: {e:?}");
+                        return;
+                    }
+                };
+                let stack = match prompt("Enter resource") {
+                    Ok(s) => parse_resource!(s),
+                    Err(e) => {
+                        eprintln!("Couldn't get resource: {e:?}");
+                        return;
+                    }
+                };
+                (method, stack)
+            }
         };
-        state.calculator.add_resource(resource);
+        match method {
+            ResourceModifier::Add => state.calculator.add_resource(resource),
+            ResourceModifier::Remove => state.calculator.remove_resource(resource),
+        }
     }
 
     fn example(&self) -> &'static str {
-        "resource [stack]"
+        "resource [<add|remove> stack]"
     }
 
     fn short_help(&self) -> &'static str {
-        "Adds `stack` as a resource that is already available for crafting"
+        "Adds or removes `stack` as a resource that is already available for crafting"
     }
 
     fn long_help(&self) -> &'static str {
-        "Adds `stack` as a resource that is already available and therefore does not need to be crafted"
+        "Adds or removes `stack` as a resource that is already available and therefore does not need to be crafted"
     }
+}
+
+enum ResourceModifier {
+    Add,
+    Remove,
 }
 
 struct Target;

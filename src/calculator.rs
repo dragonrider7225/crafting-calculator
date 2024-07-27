@@ -63,6 +63,22 @@ impl Calculator {
         self.calculate_steps();
     }
 
+    /// Removes the given stack from the set of resources that are already available and do not need
+    /// to be crafted.
+    pub fn remove_resource(&mut self, resource: Stack) {
+        if let Some(count) = self.initial_materials.get_mut(resource.item()) {
+            match count.saturating_sub(resource.count()) {
+                0 => {
+                    self.initial_materials.remove(resource.item());
+                }
+                new_count => {
+                    *count = new_count;
+                }
+            }
+        }
+        self.calculate_steps();
+    }
+
     /// Gets an iterator over all the resources that have been added with [`self.add_resource()`].
     ///
     /// [`self.add_resource()`]: #method.add_resource
