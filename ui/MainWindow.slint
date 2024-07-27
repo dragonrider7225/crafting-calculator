@@ -15,6 +15,10 @@ export component MainWindow inherits Window {
     callback add_recipe(Recipe);
     callback set_target_clicked();
     callback set_target();
+    callback add_resource_clicked();
+    callback add_resource(ItemStack);
+    callback remove_resource_clicked();
+    callback remove_resource(ItemStack);
     preferred-width: 480px;
     preferred-height: 360px;
 
@@ -35,6 +39,20 @@ export component MainWindow inherits Window {
                     min-height: 0px;
                     text: "Add Recipe";
                     clicked => { root.add_recipe_clicked(); }
+                }
+                Button {
+                    horizontal-stretch: 0;
+                    min-width: 0px;
+                    min-height: 0px;
+                    text: "Add Resource";
+                    clicked => { root.add_resource_clicked(); }
+                }
+                Button {
+                    horizontal-stretch: 0;
+                    min-width: 0px;
+                    min-height: 0px;
+                    text: "Remove Resource";
+                    clicked => { root.remove_resource_clicked(); }
                 }
                 Text { horizontal-stretch: 1;}
             }

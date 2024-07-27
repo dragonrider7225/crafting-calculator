@@ -24,7 +24,7 @@ mod gui {
     use crafting_calculator::Stack;
     use slint::{Model as _, ModelRc, SharedString, VecModel, Weak};
 
-    use crate::State;
+    use crate::{ResourceModifier, State};
 
     slint::include_modules!();
 
@@ -90,6 +90,44 @@ mod gui {
                     .add_recipes(vec![recipe.into()]);
                 this_weak.unwrap().invoke_set_target();
             });
+            let this_weak = this.as_weak();
+            this.on_add_resource_clicked(move || {
+                ResourceDialog::real_new(this_weak.clone(), ResourceModifier::Add)
+                    .unwrap()
+                    .show()
+                    .unwrap();
+            });
+            let this_weak = this.as_weak();
+            let weak_state = state.clone();
+            this.on_add_resource(move |stack| {
+                weak_state
+                    .upgrade()
+                    .unwrap()
+                    .write()
+                    .unwrap()
+                    .calculator
+                    .add_resource(stack.into());
+                this_weak.unwrap().invoke_set_target();
+            });
+            let this_weak = this.as_weak();
+            this.on_remove_resource_clicked(move || {
+                ResourceDialog::real_new(this_weak.clone(), ResourceModifier::Remove)
+                    .unwrap()
+                    .show()
+                    .unwrap();
+            });
+            let this_weak = this.as_weak();
+            let weak_state = state.clone();
+            this.on_remove_resource(move |stack| {
+                weak_state
+                    .upgrade()
+                    .unwrap()
+                    .write()
+                    .unwrap()
+                    .calculator
+                    .remove_resource(stack.into());
+                this_weak.unwrap().invoke_set_target();
+            });
             this.invoke_set_target();
             Ok(this)
         }
@@ -153,6 +191,31 @@ mod gui {
                         count: this.get_result_count(),
                     },
                 });
+                this_weak.unwrap().hide().unwrap();
+            });
+            Ok(this)
+        }
+    }
+
+    impl ResourceDialog {
+        pub(crate) fn real_new(
+            main_window: Weak<MainWindow>,
+            modifier: ResourceModifier,
+        ) -> Result<Self, slint::PlatformError> {
+            let this = Self::new()?;
+            let this_weak = this.as_weak();
+            this.on_cancel_clicked(move || this_weak.unwrap().hide().unwrap());
+            let this_weak = this.as_weak();
+            this.on_ok_clicked(move || {
+                let this = this_weak.unwrap();
+                let stack = ItemStack {
+                    name: this.get_item_name(),
+                    count: this.get_item_count(),
+                };
+                match modifier {
+                    ResourceModifier::Add => main_window.unwrap().invoke_add_resource(stack),
+                    ResourceModifier::Remove => main_window.unwrap().invoke_remove_resource(stack),
+                }
                 this_weak.unwrap().hide().unwrap();
             });
             Ok(this)
