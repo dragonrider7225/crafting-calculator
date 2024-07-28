@@ -1,0 +1,43 @@
+import { HorizontalBox, LineEdit, SpinBox, StandardButton } from "std-widgets.slint";
+
+export component TargetDialog inherits Dialog {
+    out property <string> item_name <=> name.text;
+    out property <int> item_count <=> count.value;
+    callback cancel_clicked();
+    callback ok_clicked();
+    forward-focus: name;
+    FocusScope {
+        HorizontalBox {
+            name := LineEdit {
+                enabled: true;
+                accepted => { root.ok_clicked(); }
+            }
+            count := SpinBox {
+                enabled: true;
+                minimum: 1;
+                maximum: 2147483647;
+                horizontal-stretch: 0;
+            }
+        }
+        key-pressed(event) => {
+            if (event.text == Key.Escape) {
+                root.cancel_clicked();
+                accept
+            } else if (event.text == Key.Return) {
+                root.ok_clicked();
+                accept
+            } else {
+                reject
+            }
+        }
+    }
+
+    StandardButton {
+        kind: cancel;
+        clicked => { root.cancel-clicked(); }
+    }
+    StandardButton {
+        kind: ok;
+        clicked => { root.ok-clicked(); }
+    }
+}

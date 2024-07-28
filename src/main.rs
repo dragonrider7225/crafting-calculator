@@ -8,10 +8,393 @@
 use std::{
     fs::{File, OpenOptions},
     io::{self, Read, Write as IoWrite},
+    rc::Rc,
+    sync::RwLock,
 };
 
+use clap::Parser;
 use crafting_calculator::{Calculator, Recipe};
-use nom::Parser;
+
+#[allow(missing_docs)]
+#[allow(missing_debug_implementations)]
+mod gui {
+    use std::{rc, sync::RwLock};
+
+    use crafting_calculator::Stack;
+    use slint::{Model as _, ModelRc, SharedString, VecModel, Weak};
+
+    use crate::{ResourceModifier, State};
+
+    slint::include_modules!();
+
+    impl ErrorDialog {
+        pub(crate) fn real_new() -> Result<Self, slint::PlatformError> {
+            let this = Self::new()?;
+            let this_weak = this.as_weak();
+            this.on_ok_clicked(move || this_weak.unwrap().hide().unwrap());
+            Ok(this)
+        }
+
+        pub(crate) fn with_message(s: &str) -> Result<Self, slint::PlatformError> {
+            let this = Self::real_new()?;
+            this.set_message(s.into());
+            Ok(this)
+        }
+    }
+
+    impl MainWindow {
+        pub(crate) fn real_new(
+            state: rc::Weak<RwLock<State>>,
+        ) -> Result<Self, slint::PlatformError> {
+            fn reinitialize_ui(this: Weak<MainWindow>, state: rc::Weak<RwLock<State>>) {
+                let state = state.upgrade().unwrap();
+                let state = state.read().unwrap();
+                let result = state.calculator.target();
+                let this = this.unwrap();
+                this.set_result(result.into());
+                let steps = state
+                    .calculator
+                    .steps()
+                    .map(calculator_step_to_recipe)
+                    .collect::<Vec<_>>();
+                this.set_steps(mk_vec_model_rc(steps));
+            }
+
+            let this = Self::new()?;
+            let this_weak = this.as_weak();
+            this.on_set_target_clicked(move || {
+                TargetDialog::real_new(this_weak.clone())
+                    .unwrap()
+                    .show()
+                    .unwrap();
+            });
+            let this_weak = this.as_weak();
+            let weak_state = state.clone();
+            this.on_set_target(move |target| {
+                weak_state
+                    .upgrade()
+                    .unwrap()
+                    .write()
+                    .unwrap()
+                    .calculator
+                    .set_target(target.into());
+                reinitialize_ui(this_weak.clone(), weak_state.clone());
+            });
+            let this_weak = this.as_weak();
+            this.on_add_recipe_clicked(move || {
+                RecipeDialog::real_new(this_weak.clone())
+                    .unwrap()
+                    .show()
+                    .unwrap();
+            });
+            let this_weak = this.as_weak();
+            let weak_state = state.clone();
+            this.on_add_recipe(move |recipe| {
+                weak_state
+                    .upgrade()
+                    .unwrap()
+                    .write()
+                    .unwrap()
+                    .calculator
+                    .add_recipes(vec![recipe.into()]);
+                reinitialize_ui(this_weak.clone(), weak_state.clone())
+            });
+            let this_weak = this.as_weak();
+            this.on_add_resource_clicked(move || {
+                ResourceDialog::real_new(this_weak.clone(), ResourceModifier::Add)
+                    .unwrap()
+                    .show()
+                    .unwrap();
+            });
+            let this_weak = this.as_weak();
+            let weak_state = state.clone();
+            this.on_add_resource(move |stack| {
+                weak_state
+                    .upgrade()
+                    .unwrap()
+                    .write()
+                    .unwrap()
+                    .calculator
+                    .add_resource(stack.into());
+                reinitialize_ui(this_weak.clone(), weak_state.clone())
+            });
+            let this_weak = this.as_weak();
+            this.on_remove_resource_clicked(move || {
+                ResourceDialog::real_new(this_weak.clone(), ResourceModifier::Remove)
+                    .unwrap()
+                    .show()
+                    .unwrap();
+            });
+            let this_weak = this.as_weak();
+            let weak_state = state.clone();
+            this.on_remove_resource(move |stack| {
+                weak_state
+                    .upgrade()
+                    .unwrap()
+                    .write()
+                    .unwrap()
+                    .calculator
+                    .remove_resource(stack.into());
+                reinitialize_ui(this_weak.clone(), weak_state.clone())
+            });
+            let weak_state = state.clone();
+            this.on_show_resources_clicked(move || {
+                Resources::real_new(mk_vec_model_rc(
+                    weak_state
+                        .upgrade()
+                        .unwrap()
+                        .read()
+                        .unwrap()
+                        .calculator
+                        .resources()
+                        .map(ItemStack::from)
+                        .collect(),
+                ))
+                .unwrap()
+                .show()
+                .unwrap()
+            });
+            reinitialize_ui(this.as_weak(), state);
+            Ok(this)
+        }
+    }
+
+    impl RecipeDialog {
+        pub(crate) fn real_new(
+            main_window: Weak<MainWindow>,
+        ) -> Result<Self, slint::PlatformError> {
+            let this = Self::new()?;
+            let this_weak = this.as_weak();
+            this.on_cancel_clicked(move || this_weak.unwrap().hide().unwrap());
+            let this_weak = this.as_weak();
+            this.on_add_ingredient(move || {
+                let this = this_weak.unwrap();
+                let ingredients = VecModel::from(
+                    this.get_ingredients()
+                        .iter()
+                        .chain([ItemStack {
+                            name: SharedString::from(""),
+                            count: 0,
+                        }])
+                        .collect::<Vec<_>>(),
+                );
+                this.set_ingredients(ModelRc::new(ingredients));
+            });
+            let this_weak = this.as_weak();
+            this.on_ok_clicked(move || {
+                let this = this_weak.unwrap();
+                let ingredients = this
+                    .get_ingredients()
+                    .iter()
+                    .filter(|ingredient| !ingredient.name.trim().is_empty() && ingredient.count > 0)
+                    .collect::<Vec<_>>();
+                if ingredients.is_empty() {
+                    ErrorDialog::with_message("Recipe must include at least one ingredient")
+                        .unwrap()
+                        .show()
+                        .unwrap();
+                    return;
+                }
+                if this.get_method().trim().is_empty() {
+                    ErrorDialog::with_message("Recipe must define a method")
+                        .unwrap()
+                        .show()
+                        .unwrap();
+                    return;
+                }
+                if this.get_result_name().trim().is_empty() || this.get_result_count() <= 0 {
+                    ErrorDialog::with_message("Recipe must have a result")
+                        .unwrap()
+                        .show()
+                        .unwrap();
+                    return;
+                }
+                main_window.unwrap().invoke_add_recipe(Recipe {
+                    ingredients: mk_vec_model_rc(ingredients),
+                    method: this.get_method(),
+                    result: ItemStack {
+                        name: this.get_result_name(),
+                        count: this.get_result_count(),
+                    },
+                });
+                this_weak.unwrap().hide().unwrap();
+            });
+            Ok(this)
+        }
+    }
+
+    impl ResourceDialog {
+        pub(crate) fn real_new(
+            main_window: Weak<MainWindow>,
+            modifier: ResourceModifier,
+        ) -> Result<Self, slint::PlatformError> {
+            let this = Self::new()?;
+            let this_weak = this.as_weak();
+            this.on_cancel_clicked(move || this_weak.unwrap().hide().unwrap());
+            let this_weak = this.as_weak();
+            this.on_ok_clicked(move || {
+                let this = this_weak.unwrap();
+                if this.get_item_name().trim().is_empty() {
+                    ErrorDialog::with_message("Resource name must not be empty")
+                        .unwrap()
+                        .show()
+                        .unwrap();
+                    return;
+                }
+                if this.get_item_count() <= 0 {
+                    ErrorDialog::with_message("Resource count must be positive")
+                        .unwrap()
+                        .show()
+                        .unwrap();
+                    return;
+                }
+                let stack = ItemStack {
+                    name: this.get_item_name(),
+                    count: this.get_item_count(),
+                };
+                match modifier {
+                    ResourceModifier::Add => main_window.unwrap().invoke_add_resource(stack),
+                    ResourceModifier::Remove => main_window.unwrap().invoke_remove_resource(stack),
+                }
+                this_weak.unwrap().hide().unwrap();
+            });
+            Ok(this)
+        }
+    }
+
+    impl Resources {
+        pub(crate) fn real_new(
+            resources: ModelRc<ItemStack>,
+        ) -> Result<Self, slint::PlatformError> {
+            let this = Self::new()?;
+            let this_weak = this.as_weak();
+            this.on_close_clicked(move || this_weak.unwrap().hide().unwrap());
+            this.set_resources(resources);
+            Ok(this)
+        }
+    }
+
+    impl TargetDialog {
+        pub(crate) fn real_new(
+            main_window: Weak<MainWindow>,
+        ) -> Result<Self, slint::PlatformError> {
+            let this = Self::new()?;
+            let weak_this = this.as_weak();
+            this.on_cancel_clicked(move || weak_this.unwrap().hide().unwrap());
+            let weak_this = this.as_weak();
+            this.on_ok_clicked(move || {
+                let this = weak_this.unwrap();
+                if this.get_item_name().trim().is_empty() {
+                    ErrorDialog::with_message("Target name must not be empty")
+                        .unwrap()
+                        .show()
+                        .unwrap();
+                    return;
+                }
+                if this.get_item_count() <= 0 {
+                    ErrorDialog::with_message("Target count must be positive")
+                        .unwrap()
+                        .show()
+                        .unwrap();
+                    return;
+                }
+                this.hide().unwrap();
+                main_window.unwrap().invoke_set_target(ItemStack {
+                    name: this.get_item_name(),
+                    count: this.get_item_count(),
+                });
+            });
+            Ok(this)
+        }
+    }
+
+    impl From<crate::Recipe> for Recipe {
+        fn from(value: crate::Recipe) -> Self {
+            Self {
+                ingredients: mk_vec_model_rc(
+                    value.ingredients().iter().map(ItemStack::from).collect(),
+                ),
+                method: value.method().into(),
+                result: value.result().into(),
+            }
+        }
+    }
+
+    impl From<Recipe> for crate::Recipe {
+        fn from(value: Recipe) -> Self {
+            Self::new(
+                value.result.into(),
+                value.method,
+                value.ingredients.iter().map(Stack::from).collect(),
+            )
+        }
+    }
+
+    impl From<ItemStack> for Stack {
+        fn from(value: ItemStack) -> Self {
+            Self::new(value.name, value.count as _)
+        }
+    }
+
+    impl From<&'_ ItemStack> for Stack {
+        fn from(value: &'_ ItemStack) -> Self {
+            Self::new(&value.name, value.count as _)
+        }
+    }
+
+    impl From<Stack> for ItemStack {
+        fn from(value: Stack) -> Self {
+            Self {
+                count: value.count() as _,
+                name: value.item().into(),
+            }
+        }
+    }
+
+    impl From<&'_ Stack> for ItemStack {
+        fn from(value: &'_ Stack) -> Self {
+            Self {
+                count: value.count() as _,
+                name: value.item().into(),
+            }
+        }
+    }
+
+    pub fn mk_vec_model_rc<T: Clone + 'static>(v: Vec<T>) -> ModelRc<T> {
+        ModelRc::new(VecModel::from(v))
+    }
+
+    fn calculator_step_to_recipe((r, c): (&crate::Recipe, usize)) -> Recipe {
+        let result = r.result();
+        let method = r.method();
+        let ingredients = r.ingredients();
+        Recipe {
+            result: ItemStack {
+                name: result.item().into(),
+                count: (result.count() * c) as _,
+            },
+            method: method.into(),
+            ingredients: mk_vec_model_rc(
+                ingredients
+                    .iter()
+                    .map(|stack| ItemStack {
+                        name: stack.item().into(),
+                        count: (stack.count() * c) as _,
+                    })
+                    .collect(),
+            ),
+        }
+    }
+}
+use gui::*;
+
+// This module exists to allow easy inspection of the transpiled `ui/MainWindow.slint`, which can
+// be found in `./target/<target>/crafting-calculator-<hash>/out/MainWindow.rs`.
+// #[allow(missing_docs)]
+// #[allow(missing_debug_implementations)]
+// mod _gui {
+//     include!("../ui/Windows.rs");
+// }
 
 fn read_line() -> io::Result<String> {
     let mut line = String::new();
@@ -34,7 +417,7 @@ struct State {
     calculator: Calculator,
 }
 
-trait Command {
+trait Action {
     fn apply(&self, arguments: &str, state: &mut State);
     fn example(&self) -> &'static str;
     fn short_help(&self) -> &'static str;
@@ -46,7 +429,7 @@ trait Command {
 
 struct Help;
 
-impl Command for Help {
+impl Action for Help {
     fn apply(&self, arguments: &str, _state: &mut State) {
         if arguments.is_empty() {
             let max_width = COMMANDS
@@ -86,8 +469,10 @@ impl Command for Help {
 
 struct Load;
 
-impl Command for Load {
+impl Action for Load {
     fn apply(&self, arguments: &str, state: &mut State) {
+        use nom::Parser;
+
         let calculator = &mut state.calculator;
         let filename = arguments;
         let mut f = match File::open(filename) {
@@ -178,7 +563,7 @@ fn write_recipes(out: &mut dyn IoWrite, calculator: &mut Calculator) {
 
 struct Print;
 
-impl Command for Print {
+impl Action for Print {
     fn apply(&self, arguments: &str, state: &mut State) {
         match arguments {
             "steps" | "" => write_steps(&mut io::stdout().lock(), &mut state.calculator),
@@ -207,7 +592,7 @@ impl Command for Print {
 
 struct NewRecipe;
 
-impl Command for NewRecipe {
+impl Action for NewRecipe {
     fn apply(&self, _arguments: &str, state: &mut State) {
         let result = match prompt("Enter result (ex: Oak Planks (4))") {
             Ok(s) => match s.parse() {
@@ -265,7 +650,7 @@ impl Command for NewRecipe {
 
 struct Resource;
 
-impl Command for Resource {
+impl Action for Resource {
     fn apply(&self, arguments: &str, state: &mut State) {
         macro_rules! parse_resource {
             ($s:ident) => {
@@ -340,10 +725,10 @@ enum ResourceModifier {
 
 struct Target;
 
-impl Command for Target {
+impl Action for Target {
     fn apply(&self, arguments: &str, state: &mut State) {
         if arguments.is_empty() {
-            println!("{}", state.calculator.target());
+            println!("Current target is {}", state.calculator.target());
             return;
         }
         let target = match arguments.parse() {
@@ -371,7 +756,7 @@ impl Command for Target {
 
 struct Write;
 
-impl Command for Write {
+impl Action for Write {
     fn apply(&self, arguments: &str, state: &mut State) {
         let open_file = |f| {
             OpenOptions::new()
@@ -433,7 +818,7 @@ impl Command for Write {
     }
 }
 
-const COMMANDS: &[(&str, &dyn Command)] = &[
+const COMMANDS: &[(&str, &dyn Action)] = &[
     ("help", &Help),
     ("load", &Load),
     ("print", &Print),
@@ -443,9 +828,7 @@ const COMMANDS: &[(&str, &dyn Command)] = &[
     ("write", &Write),
 ];
 
-fn cli() -> io::Result<()> {
-    let calculator = Calculator::new();
-    let mut state = State { calculator };
+fn cli(mut state: State) -> io::Result<()> {
     loop {
         print!("$ ");
         io::stdout().flush()?;
@@ -470,6 +853,31 @@ fn cli() -> io::Result<()> {
     }
 }
 
+#[derive(Parser, Debug)]
+struct Args {
+    #[arg(short, long)]
+    recipes: Vec<String>,
+    #[arg(short = 'g', long)]
+    use_gui: bool,
+}
+
 fn main() -> io::Result<()> {
-    cli()
+    let args = Args::parse();
+    let use_gui = args.use_gui;
+    let mut state = State {
+        calculator: Calculator::new(),
+    };
+    for file in args.recipes {
+        Load.apply(&file, &mut state);
+    }
+    if use_gui {
+        let state = Rc::new(RwLock::new(state));
+        MainWindow::real_new(Rc::downgrade(&state))
+            .unwrap()
+            .run()
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+    } else {
+        cli(state)?;
+    }
+    Ok(())
 }

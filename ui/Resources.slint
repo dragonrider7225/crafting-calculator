@@ -1,0 +1,18 @@
+import { ItemStack } from "./Recipe.slint";
+import { StandardButton , VerticalBox, ScrollView, HorizontalBox} from "std-widgets.slint";
+
+export component Resources inherits Dialog {
+    in property <[ItemStack]> resources;
+    title: "Resources";
+    min-height: 240px;
+
+    ScrollView {
+        VerticalLayout {
+            for resource in resources : HorizontalLayout {
+                Text { text: resource.name; }
+                Text { text: "x\{resource.count}"; }
+            }
+        }
+    }
+    StandardButton { kind: close; }
+}
