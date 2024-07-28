@@ -15,7 +15,6 @@ use std::{
 use clap::Parser;
 use crafting_calculator::{Calculator, Recipe};
 
-#[cfg(feature = "gui")]
 #[allow(missing_docs)]
 #[allow(missing_debug_implementations)]
 mod gui {
@@ -387,12 +386,10 @@ mod gui {
         }
     }
 }
-#[cfg(feature = "gui")]
 use gui::*;
 
 // This module exists to allow easy inspection of the transpiled `ui/MainWindow.slint`, which can
 // be found in `./target/<target>/crafting-calculator-<hash>/out/MainWindow.rs`.
-// #[cfg(feature = "gui")]
 // #[allow(missing_docs)]
 // #[allow(missing_debug_implementations)]
 // mod _gui {
@@ -860,17 +857,13 @@ fn cli(mut state: State) -> io::Result<()> {
 struct Args {
     #[arg(short, long)]
     recipes: Vec<String>,
-    #[cfg(feature = "gui")]
     #[arg(short = 'g', long)]
     use_gui: bool,
 }
 
 fn main() -> io::Result<()> {
     let args = Args::parse();
-    #[cfg(feature = "gui")]
     let use_gui = args.use_gui;
-    #[cfg(not(feature = "gui"))]
-    let use_gui = false;
     let mut state = State {
         calculator: Calculator::new(),
     };
@@ -878,14 +871,11 @@ fn main() -> io::Result<()> {
         Load.apply(&file, &mut state);
     }
     if use_gui {
-        #[cfg(feature = "gui")]
-        {
-            let state = Rc::new(RwLock::new(state));
-            MainWindow::real_new(Rc::downgrade(&state))
-                .unwrap()
-                .run()
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
-        }
+        let state = Rc::new(RwLock::new(state));
+        MainWindow::real_new(Rc::downgrade(&state))
+            .unwrap()
+            .run()
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
     } else {
         cli(state)?;
     }
