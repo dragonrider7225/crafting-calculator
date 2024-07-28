@@ -19,8 +19,9 @@ export component MainWindow inherits Window {
     callback add_resource(ItemStack);
     callback remove_resource_clicked();
     callback remove_resource(ItemStack);
-    preferred-width: 480px;
-    preferred-height: 360px;
+    callback show_resources_clicked();
+    preferred-width: 720px;
+    preferred-height: 405px;
 
     ScrollView {
         VerticalBox {
@@ -53,6 +54,13 @@ export component MainWindow inherits Window {
                     min-height: 0px;
                     text: "Remove Resource";
                     clicked => { root.remove_resource_clicked(); }
+                }
+                Button {
+                    horizontal-stretch: 0;
+                    min-width: 0px;
+                    min-height: 0px;
+                    text: "Show Resources";
+                    clicked => { root.show_resources_clicked(); }
                 }
                 Text { horizontal-stretch: 1;}
             }

@@ -138,6 +138,23 @@ mod gui {
                     .remove_resource(stack.into());
                 reinitialize_ui(this_weak.clone(), weak_state.clone())
             });
+            let weak_state = state.clone();
+            this.on_show_resources_clicked(move || {
+                Resources::real_new(mk_vec_model_rc(
+                    weak_state
+                        .upgrade()
+                        .unwrap()
+                        .read()
+                        .unwrap()
+                        .calculator
+                        .resources()
+                        .map(ItemStack::from)
+                        .collect(),
+                ))
+                .unwrap()
+                .show()
+                .unwrap()
+            });
             reinitialize_ui(this.as_weak(), state);
             Ok(this)
         }
@@ -242,6 +259,18 @@ mod gui {
                 }
                 this_weak.unwrap().hide().unwrap();
             });
+            Ok(this)
+        }
+    }
+
+    impl Resources {
+        pub(crate) fn real_new(
+            resources: ModelRc<ItemStack>,
+        ) -> Result<Self, slint::PlatformError> {
+            let this = Self::new()?;
+            let this_weak = this.as_weak();
+            this.on_close_clicked(move || this_weak.unwrap().hide().unwrap());
+            this.set_resources(resources);
             Ok(this)
         }
     }
