@@ -208,6 +208,20 @@ mod gui {
             let this_weak = this.as_weak();
             this.on_ok_clicked(move || {
                 let this = this_weak.unwrap();
+                if this.get_item_name().trim().is_empty() {
+                    ErrorDialog::with_message("Resource name must not be empty")
+                        .unwrap()
+                        .show()
+                        .unwrap();
+                    return;
+                }
+                if this.get_item_count() <= 0 {
+                    ErrorDialog::with_message("Resource count must be positive")
+                        .unwrap()
+                        .show()
+                        .unwrap();
+                    return;
+                }
                 let stack = ItemStack {
                     name: this.get_item_name(),
                     count: this.get_item_count(),
