@@ -47,22 +47,11 @@ mod gui {
         pub(crate) fn real_new(
             state: rc::Weak<RwLock<State>>,
         ) -> Result<Self, slint::PlatformError> {
-            let this = Self::new()?;
-            let this_weak = this.as_weak();
-            let weak_state = state.clone();
-            this.on_set_target_clicked(move || {
-                TargetDialog::real_new(this_weak.clone(), weak_state.clone())
-                    .unwrap()
-                    .show()
-                    .unwrap();
-            });
-            let this_weak = this.as_weak();
-            let weak_state = state.clone();
-            this.on_set_target(move || {
-                let state = weak_state.upgrade().unwrap();
+            fn reinitialize_ui(this: Weak<MainWindow>, state: rc::Weak<RwLock<State>>) {
+                let state = state.upgrade().unwrap();
                 let state = state.read().unwrap();
                 let result = state.calculator.target();
-                let this = this_weak.unwrap();
+                let this = this.unwrap();
                 this.set_result(result.into());
                 let steps = state
                     .calculator
@@ -70,6 +59,27 @@ mod gui {
                     .map(calculator_step_to_recipe)
                     .collect::<Vec<_>>();
                 this.set_steps(mk_vec_model_rc(steps));
+            }
+
+            let this = Self::new()?;
+            let this_weak = this.as_weak();
+            this.on_set_target_clicked(move || {
+                TargetDialog::real_new(this_weak.clone())
+                    .unwrap()
+                    .show()
+                    .unwrap();
+            });
+            let this_weak = this.as_weak();
+            let weak_state = state.clone();
+            this.on_set_target(move |target| {
+                weak_state
+                    .upgrade()
+                    .unwrap()
+                    .write()
+                    .unwrap()
+                    .calculator
+                    .set_target(target.into());
+                reinitialize_ui(this_weak.clone(), weak_state.clone());
             });
             let this_weak = this.as_weak();
             this.on_add_recipe_clicked(move || {
@@ -88,7 +98,7 @@ mod gui {
                     .unwrap()
                     .calculator
                     .add_recipes(vec![recipe.into()]);
-                this_weak.unwrap().invoke_set_target();
+                reinitialize_ui(this_weak.clone(), weak_state.clone())
             });
             let this_weak = this.as_weak();
             this.on_add_resource_clicked(move || {
@@ -107,7 +117,7 @@ mod gui {
                     .unwrap()
                     .calculator
                     .add_resource(stack.into());
-                this_weak.unwrap().invoke_set_target();
+                reinitialize_ui(this_weak.clone(), weak_state.clone())
             });
             let this_weak = this.as_weak();
             this.on_remove_resource_clicked(move || {
@@ -126,9 +136,9 @@ mod gui {
                     .unwrap()
                     .calculator
                     .remove_resource(stack.into());
-                this_weak.unwrap().invoke_set_target();
+                reinitialize_ui(this_weak.clone(), weak_state.clone())
             });
-            this.invoke_set_target();
+            reinitialize_ui(this.as_weak(), state);
             Ok(this)
         }
     }
@@ -239,7 +249,6 @@ mod gui {
     impl TargetDialog {
         pub(crate) fn real_new(
             main_window: Weak<MainWindow>,
-            state: rc::Weak<RwLock<State>>,
         ) -> Result<Self, slint::PlatformError> {
             let this = Self::new()?;
             let weak_this = this.as_weak();
@@ -250,15 +259,11 @@ mod gui {
                 if this.get_item_name().trim().is_empty() {
                     return;
                 }
-                state
-                    .upgrade()
-                    .unwrap()
-                    .write()
-                    .unwrap()
-                    .calculator
-                    .set_target(Stack::new(this.get_item_name(), this.get_item_count() as _));
                 this.hide().unwrap();
-                main_window.unwrap().invoke_set_target();
+                main_window.unwrap().invoke_set_target(ItemStack {
+                    name: this.get_item_name(),
+                    count: this.get_item_count(),
+                });
             });
             Ok(this)
         }
