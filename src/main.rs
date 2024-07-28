@@ -286,6 +286,17 @@ mod gui {
             this.on_ok_clicked(move || {
                 let this = weak_this.unwrap();
                 if this.get_item_name().trim().is_empty() {
+                    ErrorDialog::with_message("Target name must not be empty")
+                        .unwrap()
+                        .show()
+                        .unwrap();
+                    return;
+                }
+                if this.get_item_count() <= 0 {
+                    ErrorDialog::with_message("Target count must be positive")
+                        .unwrap()
+                        .show()
+                        .unwrap();
                     return;
                 }
                 this.hide().unwrap();
