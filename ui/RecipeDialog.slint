@@ -6,9 +6,11 @@ export component RecipeDialog inherits Dialog {
     out property <int> result_count <=> res_count.value;
     out property <string> method <=> m.text;
     in-out property <[ItemStack]> ingredients: [{ name: "", count: 0 }];
+
     callback add_ingredient();
-    callback cancel_clicked();
-    callback ok_clicked();
+    callback cancel_clicked <=> cancel-btn.clicked;
+    callback ok_clicked <=> ok-btn.clicked;
+
     forward-focus: res_name;
     FocusScope {
         VerticalLayout {
@@ -86,12 +88,6 @@ export component RecipeDialog inherits Dialog {
         }
     }
 
-    StandardButton {
-        kind: cancel;
-        clicked => { root.cancel-clicked(); }
-    }
-    StandardButton {
-        kind: ok;
-        clicked => { root.ok-clicked(); }
-    }
+    cancel-btn := StandardButton { kind: cancel; }
+    ok-btn := StandardButton { kind: ok; }
 }

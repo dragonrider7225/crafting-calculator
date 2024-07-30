@@ -3,8 +3,10 @@ import { HorizontalBox, LineEdit, SpinBox, StandardButton } from "std-widgets.sl
 export component TargetDialog inherits Dialog {
     out property <string> item_name <=> name.text;
     out property <int> item_count <=> count.value;
-    callback cancel_clicked();
-    callback ok_clicked();
+
+    callback cancel_clicked <=> cancel-btn.clicked;
+    callback ok_clicked <=> ok-btn.clicked;
+
     forward-focus: name;
     FocusScope {
         HorizontalBox {
@@ -32,12 +34,6 @@ export component TargetDialog inherits Dialog {
         }
     }
 
-    StandardButton {
-        kind: cancel;
-        clicked => { root.cancel-clicked(); }
-    }
-    StandardButton {
-        kind: ok;
-        clicked => { root.ok-clicked(); }
-    }
+    cancel-btn := StandardButton { kind: cancel; }
+    ok-btn := StandardButton { kind: ok; }
 }
