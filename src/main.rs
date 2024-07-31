@@ -27,6 +27,15 @@ mod gui {
 
     slint::include_modules!();
 
+    impl AboutDialog {
+        pub(crate) fn real_new() -> Result<Self, slint::PlatformError> {
+            let this = Self::new()?;
+            let this_weak = this.as_weak();
+            this.on_ok_clicked(move || this_weak.unwrap().hide().unwrap());
+            Ok(this)
+        }
+    }
+
     impl ErrorDialog {
         pub(crate) fn real_new() -> Result<Self, slint::PlatformError> {
             let this = Self::new()?;
@@ -61,6 +70,7 @@ mod gui {
             }
 
             let this = Self::new()?;
+            this.on_about_clicked(|| AboutDialog::real_new().unwrap().show().unwrap());
             let this_weak = this.as_weak();
             this.on_set_target_clicked(move || {
                 TargetDialog::real_new(this_weak.clone())

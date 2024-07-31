@@ -1,0 +1,17 @@
+import { StandardButton , AboutSlint, VerticalBox} from "std-widgets.slint";
+
+export component AboutDialog inherits Dialog {
+    title: "About Crafting Calculator";
+
+    VerticalBox {
+        Text {
+            text: "Calculate the steps and resources required to craft some amount of something";
+            wrap: word-wrap;
+            vertical-stretch: 0;
+        }
+        AboutSlint { vertical-stretch: 0; }
+        Text { vertical-stretch: 1; }
+    }
+
+    StandardButton { kind: ok; }
+}
