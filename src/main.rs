@@ -111,10 +111,10 @@ mod gui {
             });
             let this_weak = this.as_weak();
             this.on_add_resource_clicked(move || {
-                ResourceDialog::real_new(this_weak.clone(), ResourceModifier::Add)
-                    .unwrap()
-                    .show()
-                    .unwrap();
+                let dialog =
+                    ResourceDialog::real_new(this_weak.clone(), ResourceModifier::Add).unwrap();
+                dialog.set_add_resource(true);
+                dialog.show().unwrap();
             });
             let this_weak = this.as_weak();
             let weak_state = state.clone();
