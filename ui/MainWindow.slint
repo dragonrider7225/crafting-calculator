@@ -11,15 +11,17 @@ export component MainWindow inherits Window {
     in property <ItemStack> result;
     in property <[ItemStack]> ingredients;
     in property <[Recipe]> steps;
-    callback add_recipe_clicked();
+
+    callback add_recipe_clicked <=> add-recipe-btn.clicked;
     callback add_recipe(Recipe);
-    callback set_target_clicked();
+    callback set_target_clicked <=> set-target-btn.clicked;
     callback set_target(ItemStack);
-    callback add_resource_clicked();
+    callback add_resource_clicked <=> add-resource-btn.clicked;
     callback add_resource(ItemStack);
-    callback remove_resource_clicked();
+    callback remove_resource_clicked <=> remove-resource-btn.clicked;
     callback remove_resource(ItemStack);
-    callback show_resources_clicked();
+    callback show_resources_clicked <=> show-resources-btn.clicked;
+
     preferred-width: 720px;
     preferred-height: 405px;
 
@@ -27,40 +29,35 @@ export component MainWindow inherits Window {
         VerticalBox {
             HorizontalBox {
                 vertical-stretch: 0;
-                Button {
+                set-target-btn := Button {
                     horizontal-stretch: 0;
                     min-width: 0px;
                     min-height: 0px;
                     text: "Set Target";
-                    clicked => { root.set_target_clicked(); }
                 }
-                Button {
+                add-recipe-btn := Button {
                     horizontal-stretch: 0;
                     min-width: 0px;
                     min-height: 0px;
                     text: "Add Recipe";
-                    clicked => { root.add_recipe_clicked(); }
                 }
-                Button {
+                add-resource-btn := Button {
                     horizontal-stretch: 0;
                     min-width: 0px;
                     min-height: 0px;
                     text: "Add Resource";
-                    clicked => { root.add_resource_clicked(); }
                 }
-                Button {
+                remove-resource-btn := Button {
                     horizontal-stretch: 0;
                     min-width: 0px;
                     min-height: 0px;
                     text: "Remove Resource";
-                    clicked => { root.remove_resource_clicked(); }
                 }
-                Button {
+                show-resources-btn := Button {
                     horizontal-stretch: 0;
                     min-width: 0px;
                     min-height: 0px;
                     text: "Show Resources";
-                    clicked => { root.show_resources_clicked(); }
                 }
                 Text { horizontal-stretch: 1;}
             }
