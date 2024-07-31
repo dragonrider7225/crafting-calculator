@@ -12,6 +12,7 @@ export component MainWindow inherits Window {
     in property <[ItemStack]> ingredients;
     in property <[Recipe]> steps;
 
+    callback about_clicked <=> about-btn.clicked;
     callback add_recipe_clicked <=> add-recipe-btn.clicked;
     callback add_recipe(Recipe);
     callback set_target_clicked <=> set-target-btn.clicked;
@@ -29,6 +30,12 @@ export component MainWindow inherits Window {
         VerticalBox {
             HorizontalBox {
                 vertical-stretch: 0;
+                about-btn := Button {
+                    horizontal-stretch: 0;
+                    min-width: 0px;
+                    min-height: 0px;
+                    text: "About";
+                }
                 set-target-btn := Button {
                     horizontal-stretch: 0;
                     min-width: 0px;
