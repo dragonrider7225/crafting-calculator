@@ -1,12 +1,14 @@
 import { HorizontalBox, LineEdit, SpinBox, StandardButton } from "std-widgets.slint";
 
 export component ResourceDialog inherits Dialog {
+    in property <bool> add_resource;
     out property <string> item_name <=> name.text;
     out property <int> item_count <=> count.value;
 
     callback cancel_clicked <=> cancel-btn.clicked;
     callback ok_clicked <=> ok-btn.clicked;
 
+    title: add_resource ? "Add Resource" : "Remove Resource";
     forward-focus: name;
     FocusScope {
         HorizontalBox {

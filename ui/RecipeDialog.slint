@@ -11,6 +11,7 @@ export component RecipeDialog inherits Dialog {
     callback cancel_clicked <=> cancel-btn.clicked;
     callback ok_clicked <=> ok-btn.clicked;
 
+    title: "Add Recipe";
     forward-focus: res_name;
     FocusScope {
         VerticalLayout {
