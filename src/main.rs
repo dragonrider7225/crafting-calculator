@@ -428,12 +428,43 @@ struct State {
 }
 
 trait Action {
+    /// Perform the action with the given arguments and state.
     fn apply(&self, arguments: &str, state: &mut State);
+    /// The user-facing template for the arguments to this action.
     fn example(&self) -> &'static str;
+    /// The short help string for this action.
     fn short_help(&self) -> &'static str;
 
+    /// The long help string for this action. The default implementation delegates to
+    /// [`short_help`].
     fn long_help(&self) -> &'static str {
         self.short_help()
+    }
+}
+
+struct Craft;
+
+impl Action for Craft {
+    fn apply(&self, arguments: &str, state: &mut State) {
+        let target = match arguments.parse() {
+            Ok(target) => target,
+            Err(e) => {
+                eprintln!("Couldn't parse stack: {e}");
+                return;
+            }
+        };
+        match state.calculator.perform_craft(&target) {
+            Ok(()) => {}
+            Err(e) => eprintln!("{e}"),
+        }
+    }
+
+    fn example(&self) -> &'static str {
+        "craft <stack>"
+    }
+
+    fn short_help(&self) -> &'static str {
+        "Attempt to craft <stack>. Does not perform any crafts if any resources are missing"
     }
 }
 
@@ -605,7 +636,7 @@ struct NewRecipe;
 impl Action for NewRecipe {
     fn apply(&self, _arguments: &str, state: &mut State) {
         let result = match prompt("Enter result (ex: Oak Planks (4))") {
-            Ok(s) => match s.parse() {
+            Ok(s) => match s.trim().parse() {
                 Ok(s) => s,
                 Err(e) => {
                     eprintln!("Couldn't parse result: {e:?}");
@@ -618,7 +649,7 @@ impl Action for NewRecipe {
             }
         };
         let method = match prompt("Enter crafting method") {
-            Ok(s) => s,
+            Ok(s) => s.trim().to_string(),
             Err(e) => {
                 eprintln!("Couldn't get crafting method: {e:?}");
                 return;
@@ -627,8 +658,8 @@ impl Action for NewRecipe {
         let mut ingredients = vec![];
         loop {
             match prompt("Enter ingredient (leave blank to finish)") {
-                Ok(s) if s.is_empty() => break,
-                Ok(s) => match s.parse() {
+                Ok(s) if s.trim().is_empty() => break,
+                Ok(s) => match s.trim().parse() {
                     Ok(ingredient) => ingredients.push(ingredient),
                     Err(e) => {
                         eprintln!("Couldn't parse ingredient: {e:?}");
@@ -829,6 +860,7 @@ impl Action for Write {
 }
 
 const COMMANDS: &[(&str, &dyn Action)] = &[
+    ("craft", &Craft),
     ("help", &Help),
     ("load", &Load),
     ("print", &Print),

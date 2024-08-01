@@ -1,5 +1,6 @@
 use std::{
     fmt::{self, Display, Formatter},
+    ops::{Mul, MulAssign},
     str::FromStr,
 };
 
@@ -73,5 +74,31 @@ impl FromStr for Stack {
             .finish()
             .map(|(_, stack)| stack)
             .map_err(|e| format!("Couldn't parse stack: {e:?}"))
+    }
+}
+
+impl Mul<Count> for Stack {
+    type Output = Self;
+
+    fn mul(mut self, rhs: Count) -> Self::Output {
+        self *= rhs;
+        self
+    }
+}
+
+impl MulAssign<Count> for Stack {
+    fn mul_assign(&mut self, rhs: Count) {
+        self.count *= rhs;
+    }
+}
+
+impl Mul<Count> for &'_ Stack {
+    type Output = Stack;
+
+    fn mul(self, rhs: Count) -> Self::Output {
+        Stack {
+            name: self.name.clone(),
+            count: self.count * rhs,
+        }
     }
 }
