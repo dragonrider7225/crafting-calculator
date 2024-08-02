@@ -36,6 +36,25 @@ mod gui {
         }
     }
 
+    impl CraftDialog {
+        pub(crate) fn real_new(
+            main_window: Weak<MainWindow>,
+        ) -> Result<Self, slint::PlatformError> {
+            let this = Self::new()?;
+            let this_weak = this.as_weak();
+            this.on_cancel_clicked(move || this_weak.unwrap().hide().unwrap());
+            let this_weak = this.as_weak();
+            this.on_ok_clicked(move || {
+                let this = this_weak.unwrap();
+                let name = this.get_item_name();
+                let count = this.get_item_count();
+                main_window.unwrap().invoke_craft(ItemStack { name, count });
+                this.hide().unwrap();
+            });
+            Ok(this)
+        }
+    }
+
     impl ErrorDialog {
         pub(crate) fn real_new() -> Result<Self, slint::PlatformError> {
             let this = Self::new()?;
@@ -108,6 +127,30 @@ mod gui {
                     .calculator
                     .add_recipes(vec![recipe.into()]);
                 reinitialize_ui(this_weak.clone(), weak_state.clone())
+            });
+            let this_weak = this.as_weak();
+            this.on_craft_clicked(move || {
+                CraftDialog::real_new(this_weak.clone())
+                    .unwrap()
+                    .show()
+                    .unwrap()
+            });
+            let weak_state = state.clone();
+            this.on_craft(move |stack| {
+                match weak_state
+                    .upgrade()
+                    .unwrap()
+                    .write()
+                    .unwrap()
+                    .calculator
+                    .perform_craft(&stack.into())
+                {
+                    Ok(()) => {}
+                    Err(e) => ErrorDialog::with_message(&format!("{e}"))
+                        .unwrap()
+                        .show()
+                        .unwrap(),
+                }
             });
             let this_weak = this.as_weak();
             this.on_add_resource_clicked(move || {
