@@ -24,8 +24,8 @@ export component MainWindow inherits Window {
     callback show_resources_clicked <=> show-resources-btn.clicked;
 
     title: "Crafting Calculator";
-    preferred-width: 720px;
-    preferred-height: 405px;
+    preferred-width: 405px;
+    preferred-height: 720px;
 
     ScrollView {
         VerticalBox {
@@ -49,6 +49,9 @@ export component MainWindow inherits Window {
                     min-height: 0px;
                     text: "Add Recipe";
                 }
+                Text { horizontal-stretch: 1;}
+            }
+            HorizontalBox {
                 add-resource-btn := Button {
                     horizontal-stretch: 0;
                     min-width: 0px;
