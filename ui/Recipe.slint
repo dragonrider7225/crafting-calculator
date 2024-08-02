@@ -5,6 +5,12 @@ export struct ItemStack {
     count: int,
 }
 
+export struct Recipe {
+    result: ItemStack,
+    method: string,
+    ingredients: [ItemStack],
+}
+
 export component ItemCount inherits HorizontalBox {
     in property <ItemStack> items;
     in property <int> indent_level;
@@ -17,7 +23,7 @@ export component ItemCount inherits HorizontalBox {
     }
 }
 
-export component Recipe inherits VerticalBox {
+export component RecipeBox inherits VerticalBox {
     in property <ItemStack> result;
     in property <string> method;
     in property <[ItemStack]> ingredients;
