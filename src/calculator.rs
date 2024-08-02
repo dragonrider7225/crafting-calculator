@@ -353,19 +353,13 @@ pub enum CraftError {
 
 impl Display for CraftError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        fn write_resource(f: &mut Formatter<'_>, (name, &count): (&String, &Count)) -> fmt::Result {
-            write!(f, "{name} x{count}")
-        }
-
         match self {
             Self::MissingResources { target, resources } => {
-                let mut resources = resources.iter();
-                write!(f, "Missing [")?;
-                write_resource(f, resources.next().unwrap())?;
-                resources.try_for_each(|resource| {
-                    write!(f, ", ")?;
-                    write_resource(f, resource)
-                })?;
+                let mut resources = resources
+                    .iter()
+                    .map(|(name, &count)| Stack::new(name, count));
+                write!(f, "Missing [{}", resources.next().unwrap())?;
+                resources.try_for_each(|resource| write!(f, ", {resource}"))?;
                 write!(f, "] for crafting {target}")
             }
         }
