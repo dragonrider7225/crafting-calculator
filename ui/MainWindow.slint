@@ -17,6 +17,8 @@ export component MainWindow inherits Window {
     callback add_recipe(Recipe);
     callback set_target_clicked <=> set-target-btn.clicked;
     callback set_target(ItemStack);
+    callback craft_clicked <=> craft-btn.clicked;
+    callback craft(ItemStack);
     callback add_resource_clicked <=> add-resource-btn.clicked;
     callback add_resource(ItemStack);
     callback remove_resource_clicked <=> remove-resource-btn.clicked;
@@ -24,8 +26,8 @@ export component MainWindow inherits Window {
     callback show_resources_clicked <=> show-resources-btn.clicked;
 
     title: "Crafting Calculator";
-    preferred-width: 720px;
-    preferred-height: 405px;
+    preferred-width: 405px;
+    preferred-height: 720px;
 
     ScrollView {
         VerticalBox {
@@ -49,6 +51,15 @@ export component MainWindow inherits Window {
                     min-height: 0px;
                     text: "Add Recipe";
                 }
+                craft-btn := Button {
+                    horizontal-stretch: 0;
+                    min-width: 0px;
+                    min-height: 0px;
+                    text: "Craft Items";
+                }
+                Text { horizontal-stretch: 1;}
+            }
+            HorizontalBox {
                 add-resource-btn := Button {
                     horizontal-stretch: 0;
                     min-width: 0px;
@@ -77,6 +88,7 @@ export component MainWindow inherits Window {
             for recipe in steps : Rectangle {
                 border-color: gray;
                 border-width: 2px;
+                vertical-stretch: 0;
                 R {
                     result: recipe.result;
                     method: recipe.method;

@@ -1,5 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
+    error::Error,
+    fmt::{self, Display, Formatter},
     mem,
     rc::Rc,
 };
@@ -51,8 +53,8 @@ impl Calculator {
     }
 
     /// Adds the given stack to the set of resources that are already available and do not need to
-    /// be crafted.
-    pub fn add_resource(&mut self, resource: Stack) {
+    /// be crafted without recalculating the list of steps.
+    fn add_resource_no_recalculate(&mut self, resource: Stack) {
         match self.initial_materials.get_mut(resource.item()) {
             Some(count) => *count += resource.count(),
             None => {
@@ -60,12 +62,18 @@ impl Calculator {
                     .insert(resource.item().to_string(), resource.count());
             }
         }
+    }
+
+    /// Adds the given stack to the set of resources that are already available and do not need to
+    /// be crafted.
+    pub fn add_resource(&mut self, resource: Stack) {
+        self.add_resource_no_recalculate(resource);
         self.calculate_steps();
     }
 
     /// Removes the given stack from the set of resources that are already available and do not need
-    /// to be crafted.
-    pub fn remove_resource(&mut self, resource: Stack) {
+    /// to be crafted without recalculating the steps.
+    fn remove_resource_no_recalculate(&mut self, resource: Stack) {
         if let Some(count) = self.initial_materials.get_mut(resource.item()) {
             match count.saturating_sub(resource.count()) {
                 0 => {
@@ -76,6 +84,12 @@ impl Calculator {
                 }
             }
         }
+    }
+
+    /// Removes the given stack from the set of resources that are already available and do not need
+    /// to be crafted.
+    pub fn remove_resource(&mut self, resource: Stack) {
+        self.remove_resource_no_recalculate(resource);
         self.calculate_steps();
     }
 
@@ -88,6 +102,7 @@ impl Calculator {
             .map(|(name, &count)| Stack::new(name, count))
     }
 
+    /// Calculate and cache the steps to craft `self.target`.
     fn calculate_steps(&mut self) {
         self.steps.clear();
         self.materials.clone_from(&self.initial_materials);
@@ -250,6 +265,34 @@ impl Calculator {
         self.steps = checked_steps;
     }
 
+    /// Attempts to craft the given stack. Has no effect if some resources are missing.
+    pub fn perform_craft(&mut self, result: &Stack) -> Result<(), CraftError> {
+        let mut sub = self.clone();
+        sub.set_target(result.clone());
+        let missing_resources = sub
+            .steps()
+            .filter(|&(recipe, _)| recipe.method() == "Raw Material")
+            .map(|(recipe, repeats)| (recipe.result().item().to_string(), repeats))
+            .collect::<HashMap<_, _>>();
+        if !missing_resources.is_empty() {
+            Err(CraftError::MissingResources {
+                target: result.clone(),
+                resources: missing_resources,
+            })
+        } else {
+            sub.steps()
+                .filter(|(recipe, _)| recipe.method() != "In Storage")
+                .for_each(|(recipe, repeats)| {
+                    self.add_resource(recipe.result() * repeats);
+                    recipe.ingredients().iter().for_each(|ingredient| {
+                        self.remove_resource_no_recalculate(ingredient * repeats)
+                    });
+                });
+            self.calculate_steps();
+            Ok(())
+        }
+    }
+
     /// Sets the recipe for creating [`recipe.result()`] [`.item()`].
     ///
     /// [`recipe.result()`]: /struct.Recipe.html#method.result
@@ -276,6 +319,12 @@ impl Calculator {
 
     /// Gets the steps to convert the available materials into [`self.target()`].
     ///
+    /// Each [`Recipe`] will appear at most once, although if some item `"i"` has a total required
+    /// number of `n` and the number of `"i"` in storage is `k` with `(1..n).contains(&k)`,
+    /// production of that item will be split into `(Recipe { result: Stack { name: "i", count: 1 },
+    /// method: "In Storage", ingredients: [Stack { name: "i", count: 1 }] }, k)` and `(recipe, (n -
+    /// k).ceil_div(&recipe.result().count()))`.
+    ///
     /// [`self.target()`]: #method.target
     pub fn steps(&self) -> impl Iterator<Item = (&Recipe, Count)> + '_ {
         self.steps
@@ -289,6 +338,35 @@ impl Default for Calculator {
         Self::new()
     }
 }
+
+/// An error when performing a crafting job.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum CraftError {
+    /// Some resources required for the craft were unavailable.
+    MissingResources {
+        /// The final result of the craft.
+        target: Stack,
+        /// The resources that need to be added to perform the craft.
+        resources: HashMap<String, Count>,
+    },
+}
+
+impl Display for CraftError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MissingResources { target, resources } => {
+                let mut resources = resources
+                    .iter()
+                    .map(|(name, &count)| Stack::new(name, count));
+                write!(f, "Missing [{}", resources.next().unwrap())?;
+                resources.try_for_each(|resource| write!(f, ", {resource}"))?;
+                write!(f, "] for crafting {target}")
+            }
+        }
+    }
+}
+
+impl Error for CraftError {}
 
 #[cfg(test)]
 mod tests {
@@ -515,5 +593,35 @@ mod tests {
         calculator.add_resource(Stack::new("Stick", 1));
         let actual = calculator.steps().collect::<Vec<_>>();
         assert_eq!(&expected[..], &actual[..]);
+    }
+
+    #[test]
+    fn perform_craft() {
+        const METHOD: &str = "Crafting Table";
+        let target = Stack::new("Stick", 3);
+        let mut this = Calculator::new();
+        this.add_recipes(vec![
+            Recipe::new(
+                Stack::new("Stick", 4),
+                METHOD,
+                vec![Stack::new("Oak Planks", 2)],
+            ),
+            Recipe::new(
+                Stack::new("Oak Planks", 4),
+                METHOD,
+                vec![Stack::new("Oak Log", 1)],
+            ),
+        ]);
+        let expected = Err(CraftError::MissingResources {
+            target: Stack::new("Stick", 3),
+            resources: [("Oak Log".to_string(), 1)].into_iter().collect(),
+        });
+        let actual = this.perform_craft(&target);
+        assert_eq!(expected, actual);
+
+        this.add_resource(Stack::new("Oak Log", 1));
+        let expected = Ok(());
+        let actual = this.perform_craft(&target);
+        assert_eq!(expected, actual);
     }
 }

@@ -36,6 +36,25 @@ mod gui {
         }
     }
 
+    impl CraftDialog {
+        pub(crate) fn real_new(
+            main_window: Weak<MainWindow>,
+        ) -> Result<Self, slint::PlatformError> {
+            let this = Self::new()?;
+            let this_weak = this.as_weak();
+            this.on_cancel_clicked(move || this_weak.unwrap().hide().unwrap());
+            let this_weak = this.as_weak();
+            this.on_ok_clicked(move || {
+                let this = this_weak.unwrap();
+                let name = this.get_item_name();
+                let count = this.get_item_count();
+                main_window.unwrap().invoke_craft(ItemStack { name, count });
+                this.hide().unwrap();
+            });
+            Ok(this)
+        }
+    }
+
     impl ErrorDialog {
         pub(crate) fn real_new() -> Result<Self, slint::PlatformError> {
             let this = Self::new()?;
@@ -108,6 +127,30 @@ mod gui {
                     .calculator
                     .add_recipes(vec![recipe.into()]);
                 reinitialize_ui(this_weak.clone(), weak_state.clone())
+            });
+            let this_weak = this.as_weak();
+            this.on_craft_clicked(move || {
+                CraftDialog::real_new(this_weak.clone())
+                    .unwrap()
+                    .show()
+                    .unwrap()
+            });
+            let weak_state = state.clone();
+            this.on_craft(move |stack| {
+                match weak_state
+                    .upgrade()
+                    .unwrap()
+                    .write()
+                    .unwrap()
+                    .calculator
+                    .perform_craft(&stack.into())
+                {
+                    Ok(()) => {}
+                    Err(e) => ErrorDialog::with_message(&format!("{e}"))
+                        .unwrap()
+                        .show()
+                        .unwrap(),
+                }
             });
             let this_weak = this.as_weak();
             this.on_add_resource_clicked(move || {
@@ -428,12 +471,43 @@ struct State {
 }
 
 trait Action {
+    /// Perform the action with the given arguments and state.
     fn apply(&self, arguments: &str, state: &mut State);
+    /// The user-facing template for the arguments to this action.
     fn example(&self) -> &'static str;
+    /// The short help string for this action.
     fn short_help(&self) -> &'static str;
 
+    /// The long help string for this action. The default implementation delegates to
+    /// [`short_help`].
     fn long_help(&self) -> &'static str {
         self.short_help()
+    }
+}
+
+struct Craft;
+
+impl Action for Craft {
+    fn apply(&self, arguments: &str, state: &mut State) {
+        let target = match arguments.parse() {
+            Ok(target) => target,
+            Err(e) => {
+                eprintln!("Couldn't parse stack: {e}");
+                return;
+            }
+        };
+        match state.calculator.perform_craft(&target) {
+            Ok(()) => {}
+            Err(e) => eprintln!("{e}"),
+        }
+    }
+
+    fn example(&self) -> &'static str {
+        "craft <stack>"
+    }
+
+    fn short_help(&self) -> &'static str {
+        "Attempt to craft <stack>. Does not perform any crafts if any resources are missing"
     }
 }
 
@@ -605,7 +679,7 @@ struct NewRecipe;
 impl Action for NewRecipe {
     fn apply(&self, _arguments: &str, state: &mut State) {
         let result = match prompt("Enter result (ex: Oak Planks (4))") {
-            Ok(s) => match s.parse() {
+            Ok(s) => match s.trim().parse() {
                 Ok(s) => s,
                 Err(e) => {
                     eprintln!("Couldn't parse result: {e:?}");
@@ -618,7 +692,7 @@ impl Action for NewRecipe {
             }
         };
         let method = match prompt("Enter crafting method") {
-            Ok(s) => s,
+            Ok(s) => s.trim().to_string(),
             Err(e) => {
                 eprintln!("Couldn't get crafting method: {e:?}");
                 return;
@@ -627,8 +701,8 @@ impl Action for NewRecipe {
         let mut ingredients = vec![];
         loop {
             match prompt("Enter ingredient (leave blank to finish)") {
-                Ok(s) if s.is_empty() => break,
-                Ok(s) => match s.parse() {
+                Ok(s) if s.trim().is_empty() => break,
+                Ok(s) => match s.trim().parse() {
                     Ok(ingredient) => ingredients.push(ingredient),
                     Err(e) => {
                         eprintln!("Couldn't parse ingredient: {e:?}");
@@ -829,6 +903,7 @@ impl Action for Write {
 }
 
 const COMMANDS: &[(&str, &dyn Action)] = &[
+    ("craft", &Craft),
     ("help", &Help),
     ("load", &Load),
     ("print", &Print),
