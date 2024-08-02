@@ -1,11 +1,5 @@
-import { Recipe as R, ItemCount, ItemStack } from "./Recipe.slint";
+import { Recipe, RecipeBox, ItemCount, ItemStack } from "./Recipe.slint";
 import { Button, VerticalBox, HorizontalBox, ScrollView} from "std-widgets.slint";
-
-export struct Recipe {
-    result: ItemStack,
-    method: string,
-    ingredients: [ItemStack],
-}
 
 export component MainWindow inherits Window {
     in property <ItemStack> result;
@@ -13,12 +7,16 @@ export component MainWindow inherits Window {
     in property <[Recipe]> steps;
 
     callback about_clicked <=> about-btn.clicked;
-    callback add_recipe_clicked <=> add-recipe-btn.clicked;
-    callback add_recipe(Recipe);
     callback set_target_clicked <=> set-target-btn.clicked;
     callback set_target(ItemStack);
     callback craft_clicked <=> craft-btn.clicked;
     callback craft(ItemStack);
+
+    callback load_recipes_clicked <=> load-recipes-btn.clicked;
+    callback save_recipes_clicked <=> save-recipes-btn.clicked;
+    callback add_recipe_clicked <=> add-recipe-btn.clicked;
+    callback add_recipe(Recipe);
+
     callback add_resource_clicked <=> add-resource-btn.clicked;
     callback add_resource(ItemStack);
     callback remove_resource_clicked <=> remove-resource-btn.clicked;
@@ -45,12 +43,6 @@ export component MainWindow inherits Window {
                     min-height: 0px;
                     text: "Set Target";
                 }
-                add-recipe-btn := Button {
-                    horizontal-stretch: 0;
-                    min-width: 0px;
-                    min-height: 0px;
-                    text: "Add Recipe";
-                }
                 craft-btn := Button {
                     horizontal-stretch: 0;
                     min-width: 0px;
@@ -58,6 +50,27 @@ export component MainWindow inherits Window {
                     text: "Craft Items";
                 }
                 Text { horizontal-stretch: 1;}
+            }
+            HorizontalBox {
+                load-recipes-btn := Button {
+                    horizontal-stretch: 0;
+                    min-width: 0px;
+                    min-height: 0px;
+                    text: "Load Recipes";
+                }
+                save-recipes-btn := Button {
+                    horizontal-stretch: 0;
+                    min-width: 0px;
+                    min-height: 0px;
+                    text: "Save Recipes";
+                }
+                add-recipe-btn := Button {
+                    horizontal-stretch: 0;
+                    min-width: 0px;
+                    min-height: 0px;
+                    text: "Add Recipe";
+                }
+                Text { horizontal-stretch: 1; }
             }
             HorizontalBox {
                 add-resource-btn := Button {
@@ -89,7 +102,7 @@ export component MainWindow inherits Window {
                 border-color: gray;
                 border-width: 2px;
                 vertical-stretch: 0;
-                R {
+                RecipeBox {
                     result: recipe.result;
                     method: recipe.method;
                     ingredients: recipe.ingredients;

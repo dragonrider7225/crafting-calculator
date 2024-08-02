@@ -21,6 +21,7 @@ mod gui {
     use std::{rc, sync::RwLock};
 
     use crafting_calculator::Stack;
+    use rfd::FileDialog;
     use slint::{Model as _, ModelRc, SharedString, VecModel, Weak};
 
     use crate::{ResourceModifier, State};
@@ -74,6 +75,8 @@ mod gui {
         pub(crate) fn real_new(
             state: rc::Weak<RwLock<State>>,
         ) -> Result<Self, slint::PlatformError> {
+            use crate::{Action, Load, Write};
+
             fn reinitialize_ui(this: Weak<MainWindow>, state: rc::Weak<RwLock<State>>) {
                 let state = state.upgrade().unwrap();
                 let state = state.read().unwrap();
@@ -110,25 +113,6 @@ mod gui {
                 reinitialize_ui(this_weak.clone(), weak_state.clone());
             });
             let this_weak = this.as_weak();
-            this.on_add_recipe_clicked(move || {
-                RecipeDialog::real_new(this_weak.clone())
-                    .unwrap()
-                    .show()
-                    .unwrap();
-            });
-            let this_weak = this.as_weak();
-            let weak_state = state.clone();
-            this.on_add_recipe(move |recipe| {
-                weak_state
-                    .upgrade()
-                    .unwrap()
-                    .write()
-                    .unwrap()
-                    .calculator
-                    .add_recipes(vec![recipe.into()]);
-                reinitialize_ui(this_weak.clone(), weak_state.clone())
-            });
-            let this_weak = this.as_weak();
             this.on_craft_clicked(move || {
                 CraftDialog::real_new(this_weak.clone())
                     .unwrap()
@@ -152,6 +136,73 @@ mod gui {
                         .unwrap(),
                 }
             });
+
+            let weak_state = state.clone();
+            this.on_load_recipes_clicked(move || {
+                if let Some(filename) = FileDialog::new()
+                    .add_filter("Recipe list", &["lst"])
+                    .set_directory(std::env::current_dir().unwrap_or_else(|_| ".".into()))
+                    .pick_file()
+                {
+                    let filename = match filename.to_str() {
+                        None => {
+                            ErrorDialog::with_message("Cannot open file with non-UTF-8 path")
+                                .unwrap()
+                                .show()
+                                .unwrap();
+                            return;
+                        }
+                        Some(filename) => filename,
+                    };
+                    Load.apply(
+                        filename,
+                        &mut weak_state.upgrade().unwrap().write().unwrap(),
+                    );
+                }
+            });
+            let weak_state = state.clone();
+            this.on_save_recipes_clicked(move || {
+                if let Some(filename) = FileDialog::new()
+                    .add_filter("Recipe list", &["lst"])
+                    .set_directory(std::env::current_dir().unwrap_or_else(|_| ".".into()))
+                    .save_file()
+                {
+                    let filename = match filename.to_str() {
+                        None => {
+                            ErrorDialog::with_message("Cannot open file with non-UTF-8 path")
+                                .unwrap()
+                                .show()
+                                .unwrap();
+                            return;
+                        }
+                        Some(filename) => filename,
+                    };
+                    Write.apply(
+                        filename,
+                        &mut weak_state.upgrade().unwrap().write().unwrap(),
+                    );
+                }
+            });
+            let this_weak = this.as_weak();
+            this.on_add_recipe_clicked(move || {
+                RecipeDialog::real_new(this_weak.clone())
+                    .unwrap()
+                    .show()
+                    .unwrap();
+            });
+            let this_weak = this.as_weak();
+            let weak_state = state.clone();
+            this.on_add_recipe(move |recipe| {
+                weak_state
+                    .upgrade()
+                    .unwrap()
+                    .write()
+                    .unwrap()
+                    .calculator
+                    .add_recipes(vec![recipe.into()]);
+                reinitialize_ui(this_weak.clone(), weak_state.clone())
+            });
+
             let this_weak = this.as_weak();
             this.on_add_resource_clicked(move || {
                 let dialog =
