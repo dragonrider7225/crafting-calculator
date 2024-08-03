@@ -16,6 +16,7 @@ export component MainWindow inherits Window {
     callback save_recipes_clicked <=> save-recipes-btn.clicked;
     callback add_recipe_clicked <=> add-recipe-btn.clicked;
     callback add_recipe(Recipe);
+    callback show_recipes_clicked <=> show-recipes-btn.clicked;
 
     callback add_resource_clicked <=> add-resource-btn.clicked;
     callback add_resource(ItemStack);
@@ -24,7 +25,7 @@ export component MainWindow inherits Window {
     callback show_resources_clicked <=> show-resources-btn.clicked;
 
     title: "Crafting Calculator";
-    preferred-width: 405px;
+    preferred-width: 450px;
     preferred-height: 720px;
 
     ScrollView {
@@ -69,6 +70,12 @@ export component MainWindow inherits Window {
                     min-width: 0px;
                     min-height: 0px;
                     text: "Add Recipe";
+                }
+                show-recipes-btn := Button {
+                    horizontal-stretch: 0;
+                    min-width: 0px;
+                    min-height: 0px;
+                    text: "Show Recipes";
                 }
                 Text { horizontal-stretch: 1; }
             }
