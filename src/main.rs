@@ -119,6 +119,7 @@ mod gui {
                     .show()
                     .unwrap()
             });
+            let this_weak = this.as_weak();
             let weak_state = state.clone();
             this.on_craft(move |stack| {
                 match weak_state
@@ -129,7 +130,7 @@ mod gui {
                     .calculator
                     .perform_craft(&stack.into())
                 {
-                    Ok(()) => {}
+                    Ok(()) => reinitialize_ui(this_weak.clone(), weak_state.clone()),
                     Err(e) => ErrorDialog::with_message(&format!("{e}"))
                         .unwrap()
                         .show()
