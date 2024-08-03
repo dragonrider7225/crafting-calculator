@@ -1,0 +1,20 @@
+import { ItemStack, Recipe, RecipeBox } from "./Recipe.slint";
+import { StandardButton , VerticalBox, ScrollView, HorizontalBox} from "std-widgets.slint";
+
+export component Recipes inherits Dialog {
+    in property <[Recipe]> recipes;
+    title: "Recipes";
+    min-height: 240px;
+    min-width: 360px;
+
+    ScrollView {
+        VerticalLayout {
+            for recipe in recipes : RecipeBox {
+                result: recipe.result;
+                method: recipe.method;
+                ingredients: recipe.ingredients;
+            }
+        }
+    }
+    StandardButton { kind: close; }
+}

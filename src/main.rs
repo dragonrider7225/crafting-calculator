@@ -202,6 +202,13 @@ mod gui {
                     .add_recipes(vec![recipe.into()]);
                 reinitialize_ui(this_weak.clone(), weak_state.clone())
             });
+            let weak_state = state.clone();
+            this.on_show_recipes_clicked(move || {
+                Recipes::real_new(weak_state.clone())
+                    .unwrap()
+                    .show()
+                    .unwrap()
+            });
 
             let this_weak = this.as_weak();
             this.on_add_resource_clicked(move || {
@@ -327,6 +334,29 @@ mod gui {
         }
     }
 
+    impl Recipes {
+        pub(crate) fn real_new(
+            state: rc::Weak<RwLock<State>>,
+        ) -> Result<Self, slint::PlatformError> {
+            let this = Self::new()?;
+            let recipes = mk_vec_model_rc(
+                state
+                    .upgrade()
+                    .unwrap()
+                    .read()
+                    .unwrap()
+                    .calculator
+                    .recipes()
+                    .map(Recipe::from)
+                    .collect(),
+            );
+            this.set_recipes(recipes);
+            let this_weak = this.as_weak();
+            this.on_close_clicked(move || this_weak.unwrap().hide().unwrap());
+            Ok(this)
+        }
+    }
+
     impl ResourceDialog {
         pub(crate) fn real_new(
             main_window: Weak<MainWindow>,
@@ -414,6 +444,12 @@ mod gui {
 
     impl From<crate::Recipe> for Recipe {
         fn from(value: crate::Recipe) -> Self {
+            Self::from(&value)
+        }
+    }
+
+    impl From<&'_ crate::Recipe> for Recipe {
+        fn from(value: &'_ crate::Recipe) -> Self {
             Self {
                 ingredients: mk_vec_model_rc(
                     value.ingredients().iter().map(ItemStack::from).collect(),
