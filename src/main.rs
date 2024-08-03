@@ -122,15 +122,28 @@ mod gui {
             let this_weak = this.as_weak();
             let weak_state = state.clone();
             this.on_craft(move |stack| {
-                match weak_state
+                // Force the write guard to be released immediately, since it seems to have been
+                // held for the entirety of the match expression, resulting in a deadlock when
+                // getting the steps.
+                let result = weak_state
                     .upgrade()
                     .unwrap()
                     .write()
                     .unwrap()
                     .calculator
-                    .perform_craft(&stack.into())
-                {
-                    Ok(()) => reinitialize_ui(this_weak.clone(), weak_state.clone()),
+                    .perform_craft(&stack.into());
+                match result {
+                    Ok(()) => this_weak.unwrap().set_steps(mk_vec_model_rc(
+                        weak_state
+                            .upgrade()
+                            .unwrap()
+                            .read()
+                            .unwrap()
+                            .calculator
+                            .steps()
+                            .map(calculator_step_to_recipe)
+                            .collect(),
+                    )),
                     Err(e) => ErrorDialog::with_message(&format!("{e}"))
                         .unwrap()
                         .show()
