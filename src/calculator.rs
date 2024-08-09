@@ -268,6 +268,12 @@ impl Calculator {
     /// Attempts to craft the given stack. Has no effect if some resources are missing.
     pub fn perform_craft(&mut self, result: &Stack) -> Result<(), CraftError> {
         let mut sub = self.clone();
+        let already_crafted = sub
+            .resources()
+            .find(|resource| resource.item() == result.item());
+        if let Some(already_crafted) = already_crafted {
+            sub.remove_resource_no_recalculate(already_crafted);
+        }
         sub.set_target(result.clone());
         let missing_resources = sub
             .steps()
@@ -623,5 +629,34 @@ mod tests {
         let expected = Ok(());
         let actual = this.perform_craft(&target);
         assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn craft_works_when_item_is_resource() {
+        const METHOD: &str = "Crafting Table";
+        let mut this = Calculator::new();
+        this.add_recipes(vec![
+            Recipe::new(
+                Stack::new("Stick", 4),
+                METHOD,
+                vec![Stack::new("Oak Planks", 2)],
+            ),
+            Recipe::new(
+                Stack::new("Oak Planks", 4),
+                METHOD,
+                vec![Stack::new("Oak Log", 1)],
+            ),
+        ]);
+        this.add_resource(Stack::new("Oak Log", 4));
+        let mut expected = HashMap::new();
+        expected.insert("Oak Log".to_string(), 3);
+        expected.insert("Oak Planks".to_string(), 2);
+        expected.insert("Stick".to_string(), 4);
+        this.perform_craft(&Stack::new("Stick", 3)).unwrap();
+        assert_eq!(expected, this.initial_materials);
+        *expected.get_mut("Stick").unwrap() += 4;
+        expected.remove("Oak Planks");
+        this.perform_craft(&Stack::new("Stick", 2)).unwrap();
+        assert_eq!(expected, this.initial_materials);
     }
 }
