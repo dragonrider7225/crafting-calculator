@@ -24,6 +24,9 @@ export component MainWindow inherits Window {
     callback remove_resource(ItemStack);
     callback show_resources_clicked <=> show-resources-btn.clicked;
 
+    callback load_resources_clicked <=> load-resources-btn.clicked;
+    callback save_resources_clicked <=> save-resources-btn.clicked;
+
     title: "Crafting Calculator";
     preferred-width: 450px;
     preferred-height: 720px;
@@ -97,6 +100,21 @@ export component MainWindow inherits Window {
                     min-width: 0px;
                     min-height: 0px;
                     text: "Show Resources";
+                }
+                Text { horizontal-stretch: 1;}
+            }
+            HorizontalBox {
+                load-resources-btn := Button {
+                    horizontal-stretch: 0;
+                    min-width: 0px;
+                    min-height: 0px;
+                    text: "Load Resources";
+                }
+                save-resources-btn := Button {
+                    horizontal-stretch: 0;
+                    min-width: 0px;
+                    min-height: 0px;
+                    text: "Save Resources";
                 }
                 Text { horizontal-stretch: 1;}
             }

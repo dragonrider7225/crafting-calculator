@@ -71,6 +71,15 @@ impl Calculator {
         self.calculate_steps();
     }
 
+    /// Adds the given stacks to the set of resources that are already available and do not need to
+    /// be crafted.
+    pub fn add_resources(&mut self, resources: impl IntoIterator<Item = Stack>) {
+        resources
+            .into_iter()
+            .for_each(|resource| self.add_resource_no_recalculate(resource));
+        self.calculate_steps();
+    }
+
     /// Removes the given stack from the set of resources that are already available and do not need
     /// to be crafted without recalculating the steps.
     fn remove_resource_no_recalculate(&mut self, resource: Stack) {
