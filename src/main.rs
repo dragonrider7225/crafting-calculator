@@ -6,19 +6,22 @@
 #![cfg_attr(not(debug_assertions), deny(clippy::todo))]
 
 use std::{
-    fs::{File, OpenOptions},
-    io::{self, Read, Write as IoWrite},
+    fs::{self, OpenOptions},
+    io::{self, Write as IoWrite},
     rc::Rc,
     sync::RwLock,
 };
 
+use nom::Parser as _;
+
 use clap::Parser;
+
 use crafting_calculator::{Calculator, Recipe};
 
 #[allow(missing_docs)]
 #[allow(missing_debug_implementations)]
 mod gui {
-    use std::{rc, sync::RwLock};
+    use std::{cmp::Reverse, fs::OpenOptions, rc, sync::RwLock};
 
     use crafting_calculator::Stack;
     use rfd::FileDialog;
@@ -71,12 +74,14 @@ mod gui {
         }
     }
 
+    fn show_error(s: &str) {
+        ErrorDialog::with_message(s).unwrap().show().unwrap()
+    }
+
     impl MainWindow {
         pub(crate) fn real_new(
             state: rc::Weak<RwLock<State>>,
         ) -> Result<Self, slint::PlatformError> {
-            use crate::{Action, Load, Write};
-
             fn reinitialize_ui(this: Weak<MainWindow>, state: rc::Weak<RwLock<State>>) {
                 let state = state.upgrade().unwrap();
                 let state = state.read().unwrap();
@@ -144,34 +149,27 @@ mod gui {
                             .map(calculator_step_to_recipe)
                             .collect(),
                     )),
-                    Err(e) => ErrorDialog::with_message(&format!("{e}"))
-                        .unwrap()
-                        .show()
-                        .unwrap(),
+                    Err(e) => show_error(&format!("{e}")),
                 }
             });
 
             let weak_state = state.clone();
             this.on_load_recipes_clicked(move || {
                 if let Some(filename) = FileDialog::new()
-                    .add_filter("Recipe list", &["lst"])
+                    .add_filter("Recipe list", &["lst", "recipes"])
                     .set_directory(std::env::current_dir().unwrap_or_else(|_| ".".into()))
                     .pick_file()
                 {
-                    let filename = match filename.to_str() {
-                        None => {
-                            ErrorDialog::with_message("Cannot open file with non-UTF-8 path")
-                                .unwrap()
-                                .show()
-                                .unwrap();
-                            return;
-                        }
-                        Some(filename) => filename,
+                    let Some(filename) = filename.to_str() else {
+                        show_error("Cannot open file with non-UTF-8 path");
+                        return;
                     };
-                    Load.apply(
+                    if let Err(e) = crate::read_recipes(
                         filename,
                         &mut weak_state.upgrade().unwrap().write().unwrap(),
-                    );
+                    ) {
+                        show_error(&format!("Couldn't read recipes from {filename:?}: {e:?}"));
+                    };
                 }
             });
             let weak_state = state.clone();
@@ -181,19 +179,25 @@ mod gui {
                     .set_directory(std::env::current_dir().unwrap_or_else(|_| ".".into()))
                     .save_file()
                 {
-                    let filename = match filename.to_str() {
-                        None => {
-                            ErrorDialog::with_message("Cannot open file with non-UTF-8 path")
-                                .unwrap()
-                                .show()
-                                .unwrap();
-                            return;
-                        }
-                        Some(filename) => filename,
+                    let Ok(filename) = filename
+                        .to_str()
+                        .ok_or_else(|| show_error("Cannot open file with non-UTF-8 path"))
+                    else {
+                        return;
                     };
-                    Write.apply(
-                        filename,
-                        &mut weak_state.upgrade().unwrap().write().unwrap(),
+                    let Ok(mut out) = OpenOptions::new()
+                        .write(true)
+                        .truncate(true)
+                        .create(true)
+                        .read(false)
+                        .open(filename)
+                        .map_err(|e| show_error(&format!("Cannot open {filename:?}: {e:?}")))
+                    else {
+                        return;
+                    };
+                    crate::write_recipes(
+                        &mut out,
+                        &mut weak_state.upgrade().unwrap().write().unwrap().calculator,
                     );
                 }
             });
@@ -264,20 +268,71 @@ mod gui {
             });
             let weak_state = state.clone();
             this.on_show_resources_clicked(move || {
-                Resources::real_new(mk_vec_model_rc(
-                    weak_state
-                        .upgrade()
-                        .unwrap()
-                        .read()
-                        .unwrap()
-                        .calculator
-                        .resources()
-                        .map(ItemStack::from)
-                        .collect(),
-                ))
-                .unwrap()
-                .show()
-                .unwrap()
+                let mut resources = weak_state
+                    .upgrade()
+                    .unwrap()
+                    .read()
+                    .unwrap()
+                    .calculator
+                    .resources()
+                    .collect::<Vec<_>>();
+                resources.sort_by_key(|resource| resource.item().to_owned());
+                Resources::real_new(resources.into_iter().map(ItemStack::from))
+                    .unwrap()
+                    .show()
+                    .unwrap()
+            });
+
+            let weak_state = state.clone();
+            this.on_load_resources_clicked(move || {
+                if let Some(filename) = FileDialog::new()
+                    .add_filter("Resource list", &["resources"])
+                    .set_directory(std::env::current_dir().unwrap_or_else(|_| ".".into()))
+                    .pick_file()
+                {
+                    let filename = match filename.to_str() {
+                        None => {
+                            show_error("Cannot open file with non-UTF-8 path");
+                            return;
+                        }
+                        Some(filename) => filename,
+                    };
+                    if let Err(e) = crate::read_resources(
+                        filename,
+                        &mut weak_state.upgrade().unwrap().write().unwrap(),
+                    ) {
+                        eprintln!("Couldn't read resources from {filename:?}: {e:?}")
+                    };
+                }
+            });
+            let weak_state = state.clone();
+            this.on_save_resources_clicked(move || {
+                if let Some(filename) = FileDialog::new()
+                    .add_filter("Resource list", &["resources"])
+                    .set_directory(std::env::current_dir().unwrap_or_else(|_| ".".into()))
+                    .save_file()
+                {
+                    let Ok(filename) = filename
+                        .to_str()
+                        .ok_or_else(|| show_error("Cannot open file with non-UTF-8 path"))
+                    else {
+                        return;
+                    };
+                    let Ok(mut out) = OpenOptions::new()
+                        .write(true)
+                        .truncate(true)
+                        .create(true)
+                        .read(false)
+                        .open(filename)
+                        .map_err(|e| show_error(&format!("Couldn't open {filename:?}: {e:?}")))
+                    else {
+                        return;
+                    };
+                    crate::write_resources(
+                        &mut out,
+                        &mut weak_state.upgrade().unwrap().write().unwrap().calculator,
+                    );
+                }
             });
             reinitialize_ui(this.as_weak(), state);
             Ok(this)
@@ -314,24 +369,15 @@ mod gui {
                     .filter(|ingredient| !ingredient.name.trim().is_empty() && ingredient.count > 0)
                     .collect::<Vec<_>>();
                 if ingredients.is_empty() {
-                    ErrorDialog::with_message("Recipe must include at least one ingredient")
-                        .unwrap()
-                        .show()
-                        .unwrap();
+                    show_error("Recipe must include at least one ingredient");
                     return;
                 }
                 if this.get_method().trim().is_empty() {
-                    ErrorDialog::with_message("Recipe must define a method")
-                        .unwrap()
-                        .show()
-                        .unwrap();
+                    show_error("Recipe must define a method");
                     return;
                 }
                 if this.get_result_name().trim().is_empty() || this.get_result_count() <= 0 {
-                    ErrorDialog::with_message("Recipe must have a result")
-                        .unwrap()
-                        .show()
-                        .unwrap();
+                    show_error("Recipe must have a result");
                     return;
                 }
                 main_window.unwrap().invoke_add_recipe(Recipe {
@@ -383,17 +429,11 @@ mod gui {
             this.on_ok_clicked(move || {
                 let this = this_weak.unwrap();
                 if this.get_item_name().trim().is_empty() {
-                    ErrorDialog::with_message("Resource name must not be empty")
-                        .unwrap()
-                        .show()
-                        .unwrap();
+                    show_error("Resource name must not be empty");
                     return;
                 }
                 if this.get_item_count() <= 0 {
-                    ErrorDialog::with_message("Resource count must be positive")
-                        .unwrap()
-                        .show()
-                        .unwrap();
+                    show_error("Resource count must be positive");
                     return;
                 }
                 let stack = ItemStack {
@@ -412,12 +452,14 @@ mod gui {
 
     impl Resources {
         pub(crate) fn real_new(
-            resources: ModelRc<ItemStack>,
+            resources: impl IntoIterator<Item = ItemStack>,
         ) -> Result<Self, slint::PlatformError> {
+            let mut resources = resources.into_iter().collect::<Vec<_>>();
+            resources.sort();
             let this = Self::new()?;
             let this_weak = this.as_weak();
             this.on_close_clicked(move || this_weak.unwrap().hide().unwrap());
-            this.set_resources(resources);
+            this.set_resources(mk_vec_model_rc(resources));
             Ok(this)
         }
     }
@@ -433,17 +475,11 @@ mod gui {
             this.on_ok_clicked(move || {
                 let this = weak_this.unwrap();
                 if this.get_item_name().trim().is_empty() {
-                    ErrorDialog::with_message("Target name must not be empty")
-                        .unwrap()
-                        .show()
-                        .unwrap();
+                    show_error("Target name must not be empty");
                     return;
                 }
                 if this.get_item_count() <= 0 {
-                    ErrorDialog::with_message("Target count must be positive")
-                        .unwrap()
-                        .show()
-                        .unwrap();
+                    show_error("Target count must be positive");
                     return;
                 }
                 this.hide().unwrap();
@@ -511,6 +547,22 @@ mod gui {
                 count: value.count() as _,
                 name: value.item().into(),
             }
+        }
+    }
+
+    impl Eq for ItemStack {}
+
+    impl Ord for ItemStack {
+        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+            self.name
+                .cmp(&other.name)
+                .then(Reverse(self.count).cmp(&Reverse(other.count)))
+        }
+    }
+
+    impl PartialOrd for ItemStack {
+        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+            Some(self.cmp(other))
         }
     }
 
@@ -652,49 +704,57 @@ impl Action for Help {
     }
 }
 
+fn read_recipes(filename: &str, state: &mut State) -> io::Result<()> {
+    let s = fs::read_to_string(filename)?;
+    let (junk, recipes) = Recipe::parse_recipes("Crafting Table")
+        .parse(&s)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("{e:?}")))?;
+    if !junk.is_empty() {
+        eprintln!("Found junk data {junk:?} at the end of the recipe file");
+    }
+    state.calculator.add_recipes(recipes);
+    Ok(())
+}
+
+fn read_resources(filename: &str, state: &mut State) -> io::Result<()> {
+    let s = fs::read_to_string(filename)?;
+    state.calculator.add_resources(s.lines().flat_map(|line| {
+        line.parse()
+            .map_err(|e| eprintln!("Couldn't parse {line:?} as resource: {e:?}"))
+            .ok()
+    }));
+    Ok(())
+}
+
 struct Load;
 
 impl Action for Load {
     fn apply(&self, arguments: &str, state: &mut State) {
-        use nom::Parser;
-
-        let calculator = &mut state.calculator;
-        let filename = arguments;
-        let mut f = match File::open(filename) {
-            Ok(f) => f,
-            Err(e) => {
-                eprintln!("Couldn't open file {filename:?}: {e:?}");
-                return;
-            }
+        let Some((method, filename)) = arguments.split_once(' ') else {
+            eprintln!("`load` command requires at least two arguments");
+            return;
         };
-        let recipes = {
-            let mut s = String::new();
-            match f.read_to_string(&mut s) {
-                Ok(_) => {}
-                Err(e) => eprintln!("Couldn't read recipe file {filename:?}: {e:?}"),
-            }
-            match Recipe::parse_recipes("Crafting Table").parse(&s) {
-                Ok(("", recipes)) => recipes,
-                Ok((junk, recipes)) => {
-                    eprintln!("Found junk data {junk:?} at the end of the recipe file");
-                    recipes
-                }
-                Err(e) => {
-                    let e = io::Error::new(io::ErrorKind::InvalidData, format!("{e:?}"));
-                    eprintln!("Couldn't parse recipe file {filename:?}: {e:?}");
-                    return;
+        match method {
+            "recipes" => {
+                if let Err(e) = read_recipes(filename, state) {
+                    eprintln!("Couldn't read recipes from {filename:?}: {e:?}");
                 }
             }
-        };
-        calculator.add_recipes(recipes);
+            "resources" => {
+                if let Err(e) = read_resources(filename, state) {
+                    eprintln!("Couldn't read resources from {filename:?}: {e:?}");
+                }
+            }
+            _ => eprintln!("Unknown method {method:?}. Expected `recipes` or `resources`"),
+        }
     }
 
     fn example(&self) -> &'static str {
-        "load <file>"
+        "load <recipes|resources> <file>"
     }
 
     fn short_help(&self) -> &'static str {
-        "Read recipes from `file`."
+        "Read recipes or resources from `file`."
     }
 }
 
@@ -955,7 +1015,7 @@ impl Action for Write {
             if what == arguments.trim() {
                 (open_file(what), "recipes")
             } else {
-                let file = arguments.strip_suffix(what).unwrap();
+                let file = arguments.strip_suffix(what).unwrap().trim();
                 (open_file(file), what)
             }
         } else {
@@ -1045,6 +1105,8 @@ struct Args {
     recipes: Vec<String>,
     #[arg(short = 'g', long)]
     use_gui: bool,
+    #[arg(long)]
+    resources: Vec<String>,
 }
 
 fn main() -> io::Result<()> {
@@ -1054,7 +1116,10 @@ fn main() -> io::Result<()> {
         calculator: Calculator::new(),
     };
     for file in args.recipes {
-        Load.apply(&file, &mut state);
+        read_recipes(&file, &mut state)?;
+    }
+    for file in args.resources {
+        read_resources(&file, &mut state)?;
     }
     if use_gui {
         let state = Rc::new(RwLock::new(state));
