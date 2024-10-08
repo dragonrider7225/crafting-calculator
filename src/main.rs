@@ -459,7 +459,25 @@ mod gui {
             let this = Self::new()?;
             let this_weak = this.as_weak();
             this.on_close_clicked(move || this_weak.unwrap().hide().unwrap());
-            this.set_resources(mk_vec_model_rc(resources));
+            this.set_resources(mk_vec_model_rc(resources.clone()));
+            let this_weak = this.as_weak();
+            this.on_search_edited(move |search_text| {
+                let this = this_weak.unwrap();
+                let search_text: &str = &search_text;
+                let case_insensitive = search_text.chars().all(|c| c.is_lowercase());
+                let visible_resources = resources
+                    .iter()
+                    .filter(|resource| {
+                        if case_insensitive {
+                            resource.name.to_lowercase().contains(search_text)
+                        } else {
+                            resource.name.contains(search_text)
+                        }
+                    })
+                    .cloned()
+                    .collect();
+                this.set_resources(mk_vec_model_rc(visible_resources));
+            });
             Ok(this)
         }
     }

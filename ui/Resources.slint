@@ -1,5 +1,5 @@
 import { ItemStack } from "./Recipe.slint";
-import { StandardButton , VerticalBox, ScrollView, HorizontalBox} from "std-widgets.slint";
+import { StandardButton , VerticalBox, ScrollView, HorizontalBox, LineEdit} from "std-widgets.slint";
 
 export component Resources inherits Dialog {
     in property <[ItemStack]> resources;
@@ -7,11 +7,18 @@ export component Resources inherits Dialog {
     min-height: 240px;
     min-width: 360px;
 
-    ScrollView {
-        VerticalLayout {
-            for resource in resources : HorizontalLayout {
-                Text { text: resource.name; }
-                Text { text: "x\{resource.count}"; }
+    callback search-edited <=> search-box.edited;
+
+    VerticalLayout {
+        search-box := LineEdit {
+            placeholder-text: "Search resources...";
+        }
+        ScrollView {
+            VerticalLayout {
+                for resource in resources : HorizontalLayout {
+                    Text { text: resource.name; }
+                    Text { text: "x\{resource.count}"; }
+                }
             }
         }
     }
