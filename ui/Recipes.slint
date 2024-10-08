@@ -1,5 +1,5 @@
 import { ItemStack, Recipe, RecipeBox } from "./Recipe.slint";
-import { StandardButton , VerticalBox, ScrollView, HorizontalBox} from "std-widgets.slint";
+import { StandardButton , VerticalBox, ScrollView, HorizontalBox, LineEdit} from "std-widgets.slint";
 
 export component Recipes inherits Dialog {
     in property <[Recipe]> recipes;
@@ -7,12 +7,19 @@ export component Recipes inherits Dialog {
     min-height: 240px;
     min-width: 360px;
 
-    ScrollView {
-        VerticalLayout {
-            for recipe in recipes : RecipeBox {
-                result: recipe.result;
-                method: recipe.method;
-                ingredients: recipe.ingredients;
+    callback search-edited <=> search-box.edited;
+
+    VerticalLayout {
+        search-box := LineEdit {
+            placeholder-text: "Search recipes...";
+        }
+        ScrollView {
+            VerticalLayout {
+                for recipe in recipes : RecipeBox {
+                    result: recipe.result;
+                    method: recipe.method;
+                    ingredients: recipe.ingredients;
+                }
             }
         }
     }
