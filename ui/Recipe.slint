@@ -11,29 +11,28 @@ export struct Recipe {
     ingredients: [ItemStack],
 }
 
-export component ItemCount inherits HorizontalBox {
+export component ItemCount inherits HorizontalLayout {
     in property <ItemStack> items;
     in property <int> indent_level;
-    spacing: 5px;
+
+    alignment: start;
     padding: 0px;
     padding-left: (root.indent-level + 1) * 5px;
     Text {
-        text: items.name + (items.count > 0 ? " x\{items.count}" : "");
-        min-width: 0px;
+        text: items.count > 0 ? "\{items.name} x\{items.count}" : "";
     }
 }
 
-export component RecipeBox inherits VerticalBox {
+export component RecipeBox inherits VerticalLayout {
     in property <ItemStack> result;
     in property <string> method;
     in property <[ItemStack]> ingredients;
-    spacing: 5px;
-    padding: 0px;
-    padding-bottom: 5px;
-    vertical-stretch: 1;
-    HorizontalBox {
+
+    alignment: start;
+    padding: 5px;
+    HorizontalLayout {
+        alignment: start;
         padding-left: 0px;
-        spacing: 0px;
         ItemCount {
             items: result;
             indent-level: 0;
@@ -41,7 +40,6 @@ export component RecipeBox inherits VerticalBox {
         Text {
             text: " (\{root.method})";
         }
-        Text { horizontal-stretch: 1; }
     }
     for ingredient in ingredients : ItemCount {
         indent-level: 1;

@@ -15,6 +15,7 @@ export component Recipes inherits Dialog {
         }
         ScrollView {
             VerticalLayout {
+                alignment: start;
                 for recipe in recipes : RecipeBox {
                     result: recipe.result;
                     method: recipe.method;
