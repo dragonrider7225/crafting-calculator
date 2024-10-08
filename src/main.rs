@@ -399,20 +399,45 @@ mod gui {
             state: rc::Weak<RwLock<State>>,
         ) -> Result<Self, slint::PlatformError> {
             let this = Self::new()?;
-            let recipes = mk_vec_model_rc(
-                state
-                    .upgrade()
-                    .unwrap()
-                    .read()
-                    .unwrap()
-                    .calculator
-                    .recipes()
-                    .map(Recipe::from)
-                    .collect(),
-            );
-            this.set_recipes(recipes);
+            let recipes = state
+                .upgrade()
+                .unwrap()
+                .read()
+                .unwrap()
+                .calculator
+                .recipes()
+                .map(Recipe::from)
+                .collect::<Vec<_>>();
+            this.set_recipes(mk_vec_model_rc(recipes.clone()));
             let this_weak = this.as_weak();
             this.on_close_clicked(move || this_weak.unwrap().hide().unwrap());
+            let this_weak = this.as_weak();
+            this.on_search_edited(move |search_text| {
+                use slint::SharedString as SString;
+
+                let this = this_weak.unwrap();
+                let search_text: &str = &search_text;
+                let case_insensitive = search_text.chars().all(|c| c.is_lowercase());
+                let matches_case_sensitive = |s: &SString| s.contains(search_text);
+                let matches = |s: &SString| s.to_lowercase().contains(search_text);
+                let visible_recipes = recipes
+                    .iter()
+                    .filter(|recipe| {
+                        let matcher: &dyn Fn(&'_ _) -> _ = if case_insensitive {
+                            &matches as &_
+                        } else {
+                            &matches_case_sensitive as &_
+                        };
+                        matcher(&recipe.result.name)
+                            || recipe
+                                .ingredients
+                                .iter()
+                                .any(|ingredient| matcher(&ingredient.name))
+                    })
+                    .cloned()
+                    .collect();
+                this.set_recipes(mk_vec_model_rc(visible_recipes));
+            });
             Ok(this)
         }
     }
