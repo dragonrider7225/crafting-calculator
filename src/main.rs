@@ -25,7 +25,7 @@ mod gui {
 
     use crafting_calculator::Stack;
     use rfd::FileDialog;
-    use slint::{Model as _, ModelRc, SharedString, VecModel, Weak};
+    use slint::{Model as _, ModelRc, SharedString, StandardListViewItem, VecModel, Weak};
 
     use crate::{ResourceModifier, State};
 
@@ -479,27 +479,36 @@ mod gui {
         pub(crate) fn real_new(
             resources: impl IntoIterator<Item = ItemStack>,
         ) -> Result<Self, slint::PlatformError> {
+            fn convert_resource(stack: &ItemStack) -> ModelRc<StandardListViewItem> {
+                mk_vec_model_rc(vec![
+                    stack.name.clone().into(),
+                    (&*stack.count.to_string()).into(),
+                ])
+            }
+
             let mut resources = resources.into_iter().collect::<Vec<_>>();
             resources.sort();
             let this = Self::new()?;
             let this_weak = this.as_weak();
             this.on_close_clicked(move || this_weak.unwrap().hide().unwrap());
-            this.set_resources(mk_vec_model_rc(resources.clone()));
+            this.set_resources(mk_vec_model_rc(
+                resources.iter().map(convert_resource).collect(),
+            ));
             let this_weak = this.as_weak();
             this.on_search_edited(move |search_text| {
                 let this = this_weak.unwrap();
                 let search_text: &str = &search_text;
-                let case_insensitive = search_text.chars().all(|c| c.is_lowercase());
+                let case_insensitive = search_text.chars().all(char::is_lowercase);
                 let visible_resources = resources
                     .iter()
-                    .filter(|resource| {
+                    .filter(|&resource| {
                         if case_insensitive {
                             resource.name.to_lowercase().contains(search_text)
                         } else {
                             resource.name.contains(search_text)
                         }
                     })
-                    .cloned()
+                    .map(convert_resource)
                     .collect();
                 this.set_resources(mk_vec_model_rc(visible_resources));
             });
