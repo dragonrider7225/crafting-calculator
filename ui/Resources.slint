@@ -15,6 +15,7 @@ export component Resources inherits Dialog {
         }
         ScrollView {
             VerticalLayout {
+                alignment: start;
                 for resource in resources : HorizontalLayout {
                     Text { text: resource.name; }
                     Text { text: "x\{resource.count}"; }
