@@ -215,7 +215,6 @@ skip = [
 # dependencies starting at the specified crate, up to a certain depth, which is
 # by default infinite.
 skip-tree = [
-    "slint@1.8.0",
     #{ crate = "ttf-parser@0.21.1", reason = "slint depends directly on ttf-parser v0.21.1 but transitively on ttf-parser v0.24.0 through winit" },
     #{ crate = "windows-core@0.52", reason = "slint depends on chrono which transitively depends on windows-core v0.52 but has updated its dependency on accesskit_winit to a version which transitively depends on windows-core v0.54" },
     #{ crate = "zbus@3", reason = "slint depends on accesskit_winit which is still using zbus v3 but rfd has updated its dependency on ashpd to a version which uses zbus v4" },
