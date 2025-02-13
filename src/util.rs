@@ -1,6 +1,6 @@
 use nom::{
     bytes::complete as bytes, character::complete as character, combinator, multi, sequence,
-    IResult,
+    IResult, Parser,
 };
 
 pub(crate) fn read_usize(s: &str) -> IResult<&str, usize> {
@@ -18,5 +18,6 @@ pub(crate) fn read_usize(s: &str) -> IResult<&str, usize> {
                 }
             })
         },
-    )(s)
+    )
+    .parse(s)
 }

@@ -83,10 +83,53 @@ pub(crate) struct RecipeParser<'d> {
     default_method: &'d str,
 }
 
-impl<'i, 'd> Parser<&'i str, Recipe, nom::error::Error<&'i str>> for RecipeParser<'d>
+impl<'i, 'd> Parser<&'i str> for RecipeParser<'d>
 where
     'd: 'i,
 {
+    type Error = nom::error::Error<&'i str>;
+    type Output = Recipe;
+
+    fn process<OM>(&mut self, s: &'i str) -> nom::PResult<OM, &'i str, Self::Output, Self::Error>
+    where
+        OM: nom::OutputMode,
+    {
+        let result_and_method = sequence::pair(
+            Stack::nom_parse,
+            sequence::terminated(
+                combinator::opt(sequence::delimited(
+                    bytes::tag(" ("),
+                    combinator::recognize(multi::many1(character::none_of(")"))),
+                    bytes::tag(")"),
+                )),
+                bytes::tag(":"),
+            ),
+        );
+        let single_ingredient = combinator::map(
+            sequence::preceded(bytes::tag(" "), Stack::nom_parse),
+            |ingredient| vec![ingredient],
+        );
+        let multiple_ingredients = multi::many1(sequence::preceded(
+            sequence::pair(character::line_ending, character::space1),
+            Stack::nom_parse,
+        ));
+        combinator::map(
+            sequence::pair(
+                result_and_method,
+                sequence::terminated(
+                    branch::alt((single_ingredient, multiple_ingredients)),
+                    character::line_ending,
+                ),
+            ),
+            |((result, method), ingredients)| Recipe {
+                result,
+                method: method.unwrap_or(self.default_method).to_string(),
+                ingredients,
+            },
+        )
+        .process::<OM>(s)
+    }
+
     fn parse(&mut self, s: &'i str) -> IResult<&'i str, Recipe> {
         let result_and_method = sequence::pair(
             Stack::nom_parse,
@@ -120,7 +163,8 @@ where
                 method: method.unwrap_or(self.default_method).to_string(),
                 ingredients,
             },
-        )(s)
+        )
+        .parse(s)
     }
 }
 
@@ -130,12 +174,18 @@ pub struct RecipesParser<'d> {
     default_method: &'d str,
 }
 
-impl<'i, 'd> Parser<&'i str, Vec<Recipe>, nom::error::Error<&'i str>> for RecipesParser<'d>
+impl<'i, 'd> Parser<&'i str> for RecipesParser<'d>
 where
     'd: 'i,
 {
-    fn parse(&mut self, s: &'i str) -> IResult<&'i str, Vec<Recipe>> {
-        multi::many0(Recipe::nom_parse(self.default_method))(s)
+    type Error = nom::error::Error<&'i str>;
+    type Output = Vec<Recipe>;
+
+    fn process<OM: nom::OutputMode>(
+        &mut self,
+        s: &'i str,
+    ) -> nom::PResult<OM, &'i str, Self::Output, Self::Error> {
+        multi::many0(Recipe::nom_parse(self.default_method)).process::<OM>(s)
     }
 }
 
