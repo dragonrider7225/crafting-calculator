@@ -6,7 +6,7 @@ use std::{
 
 use nom::{
     bytes::complete as bytes, character::complete as character, combinator as comb, multi,
-    sequence, IResult,
+    sequence, IResult, Parser as _,
 };
 
 /// The number of items in a stack.
@@ -54,7 +54,8 @@ impl Stack {
                 name: name.trim().to_string(),
                 count,
             },
-        )(s)
+        )
+        .parse(s)
     }
 }
 
