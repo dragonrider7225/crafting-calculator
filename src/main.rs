@@ -16,7 +16,7 @@ use nom::Parser as _;
 
 use clap::Parser;
 
-use crafting_calculator::{Calculator, Recipe};
+use crafting_calculator::{Calculator, Recipe, Stack};
 
 #[allow(missing_docs)]
 #[allow(missing_debug_implementations)]
@@ -83,14 +83,37 @@ mod gui {
             state: rc::Weak<RwLock<State>>,
         ) -> Result<Self, slint::PlatformError> {
             fn reinitialize_ui(this: Weak<MainWindow>, state: rc::Weak<RwLock<State>>) {
+                fn extract_stacks<'recipes>(
+                    recipes: impl Iterator<Item = (&'recipes crate::Recipe, usize)>,
+                    mut predicate: impl FnMut(&'recipes crate::Recipe) -> bool,
+                ) -> (Vec<ItemStack>, Vec<(&'recipes crate::Recipe, usize)>) {
+                    let (extracted, remaining) = recipes
+                        .into_iter()
+                        .partition::<Vec<_>, _>(|(recipe, _)| predicate(recipe));
+                    (
+                        extracted
+                            .into_iter()
+                            .map(|(recipe, mult)| recipe.result() * mult)
+                            .map(ItemStack::from)
+                            .collect(),
+                        remaining,
+                    )
+                }
                 let state = state.upgrade().unwrap();
                 let state = state.read().unwrap();
                 let result = state.calculator.target();
                 let this = this.unwrap();
                 this.set_result(result.into());
-                let steps = state
-                    .calculator
-                    .steps()
+                let (raw_materials, recipes) = extract_stacks(state.calculator.steps(), |recipe| {
+                    recipe.method() == "Raw Material"
+                });
+                this.set_raw_materials(mk_vec_model_rc(raw_materials));
+                let (in_storage, recipes) = extract_stacks(recipes.into_iter(), |recipe| {
+                    recipe.method() == "In Storage"
+                });
+                this.set_in_storage(mk_vec_model_rc(in_storage));
+                let steps = recipes
+                    .into_iter()
                     .map(calculator_step_to_recipe)
                     .collect::<Vec<_>>();
                 this.set_steps(mk_vec_model_rc(steps));
@@ -1153,12 +1176,23 @@ fn cli(mut state: State) -> io::Result<()> {
 
 #[derive(Parser, Debug)]
 struct Args {
+    /// A file of recipes that should be loaded into the calculator during start-up. May be
+    /// specified any number of times. If specified more than once, all specified files will be
+    /// loaded.
     #[arg(short, long)]
     recipes: Vec<String>,
+    /// Start the calculator in GUI mode.
     #[arg(short = 'g', long)]
     use_gui: bool,
+    /// A file of resources in storage that should be loaded into the calculator during start-up.
+    /// May be specified any number of times. If specified more than once, all specified files will
+    /// be loaded.
     #[arg(long)]
     resources: Vec<String>,
+    /// The initial target for the calculator. Should be given in the form "Item Name (count)".
+    /// Default value is "Air (1)".
+    #[arg(short, long)]
+    target: Option<Stack>,
 }
 
 fn main() -> io::Result<()> {
@@ -1172,6 +1206,9 @@ fn main() -> io::Result<()> {
     }
     for file in args.resources {
         read_resources(&file, &mut state)?;
+    }
+    if let Some(target) = args.target {
+        state.calculator.set_target(target);
     }
     if use_gui {
         let state = Rc::new(RwLock::new(state));
