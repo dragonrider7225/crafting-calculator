@@ -1176,10 +1176,17 @@ fn cli(mut state: State) -> io::Result<()> {
 
 #[derive(Parser, Debug)]
 struct Args {
+    /// A file of recipes that should be loaded into the calculator during start-up. May be
+    /// specified any number of times. If specified more than once, all specified files will be
+    /// loaded.
     #[arg(short, long)]
     recipes: Vec<String>,
+    /// Start the calculator in GUI mode.
     #[arg(short = 'g', long)]
     use_gui: bool,
+    /// A file of resources in storage that should be loaded into the calculator during start-up.
+    /// May be specified any number of times. If specified more than once, all specified files will
+    /// be loaded.
     #[arg(long)]
     resources: Vec<String>,
 }
