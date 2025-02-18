@@ -88,9 +88,18 @@ mod gui {
                 let result = state.calculator.target();
                 let this = this.unwrap();
                 this.set_result(result.into());
-                let steps = state
+                let (raw_materials, recipes) = state
                     .calculator
                     .steps()
+                    .partition::<Vec<_>, _>(|(recipe, _)| recipe.method() == "Raw Material");
+                let raw_materials = raw_materials
+                    .into_iter()
+                    .map(|(recipe, mult)| recipe.result() * mult)
+                    .map(ItemStack::from)
+                    .collect::<Vec<_>>();
+                this.set_raw_materials(mk_vec_model_rc(raw_materials));
+                let steps = recipes
+                    .into_iter()
                     .map(calculator_step_to_recipe)
                     .collect::<Vec<_>>();
                 this.set_steps(mk_vec_model_rc(steps));

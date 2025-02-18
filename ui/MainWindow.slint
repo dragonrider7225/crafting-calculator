@@ -1,9 +1,11 @@
 import { Recipe, RecipeBox, ItemCount, ItemStack } from "./Recipe.slint";
 import { Button, VerticalBox, HorizontalBox, ScrollView} from "std-widgets.slint";
+import { Header } from "Header.slint";
+import { Hr } from "Hr.slint";
 
 export component MainWindow inherits Window {
     in property <ItemStack> result;
-    in property <[ItemStack]> ingredients;
+    in property <[ItemStack]> raw_materials;
     in property <[Recipe]> steps;
 
     callback about_clicked <=> about-btn.clicked;
@@ -84,17 +86,39 @@ export component MainWindow inherits Window {
                 }
             }
 
+            Header { text: "Target:"; }
+
+            Hr { }
+
             ItemCount {
                 items <=> root.result;
             }
 
+            Rectangle {
+                border-color: transparent;
+                border-width: 1px;
+                height: 5px;
+            }
+
+            Header { text: "Raw materials:"; }
+
+            Hr { }
+
+            for material in raw-materials : ItemCount {
+                items: material;
+            }
+
+            Rectangle {
+                border-color: transparent;
+                border-width: 1px;
+                height: 5px;
+            }
+
+            Header { text: "Steps:"; }
+
             for recipe in steps : VerticalLayout {
                 alignment: start;
-                Rectangle {
-                    border-color: gray;
-                    border-width: 1px;
-                    height: 1px;
-                }
+                Hr { }
                 RecipeBox {
                     result: recipe.result;
                     method: recipe.method;
