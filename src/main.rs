@@ -16,7 +16,7 @@ use nom::Parser as _;
 
 use clap::Parser;
 
-use crafting_calculator::{Calculator, Recipe};
+use crafting_calculator::{Calculator, Recipe, Stack};
 
 #[allow(missing_docs)]
 #[allow(missing_debug_implementations)]
@@ -1189,6 +1189,10 @@ struct Args {
     /// be loaded.
     #[arg(long)]
     resources: Vec<String>,
+    /// The initial target for the calculator. Should be given in the form "Item Name (count)".
+    /// Default value is "Air (1)".
+    #[arg(short, long)]
+    target: Option<Stack>,
 }
 
 fn main() -> io::Result<()> {
@@ -1202,6 +1206,9 @@ fn main() -> io::Result<()> {
     }
     for file in args.resources {
         read_resources(&file, &mut state)?;
+    }
+    if let Some(target) = args.target {
+        state.calculator.set_target(target);
     }
     if use_gui {
         let state = Rc::new(RwLock::new(state));
