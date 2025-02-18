@@ -6,6 +6,7 @@ import { Hr } from "Hr.slint";
 export component MainWindow inherits Window {
     in property <ItemStack> result;
     in property <[ItemStack]> raw_materials;
+    in property <[ItemStack]> in_storage;
     in property <[Recipe]> steps;
 
     callback about_clicked <=> about-btn.clicked;
@@ -86,43 +87,65 @@ export component MainWindow inherits Window {
                 }
             }
 
-            Header { text: "Target:"; }
+            VerticalLayout {
+                Header { text: "Target:"; }
 
-            Hr { }
-
-            ItemCount {
-                items <=> root.result;
-            }
-
-            Rectangle {
-                border-color: transparent;
-                border-width: 1px;
-                height: 5px;
-            }
-
-            Header { text: "Raw materials:"; }
-
-            Hr { }
-
-            for material in raw-materials : ItemCount {
-                items: material;
-            }
-
-            Rectangle {
-                border-color: transparent;
-                border-width: 1px;
-                height: 5px;
-            }
-
-            Header { text: "Steps:"; }
-
-            for recipe in steps : VerticalLayout {
-                alignment: start;
                 Hr { }
-                RecipeBox {
-                    result: recipe.result;
-                    method: recipe.method;
-                    ingredients: recipe.ingredients;
+
+                ItemCount {
+                    items <=> root.result;
+                }
+            }
+
+            Rectangle {
+                border-color: transparent;
+                border-width: 1px;
+                height: 5px;
+            }
+
+            VerticalLayout {
+                Header { text: "Raw materials:"; }
+
+                Hr { }
+
+                for material in raw-materials : ItemCount {
+                    items: material;
+                }
+            }
+
+            Rectangle {
+                border-color: transparent;
+                border-width: 1px;
+                height: 5px;
+            }
+
+            VerticalLayout {
+                Header { text: "In storage:"; }
+
+                Hr { }
+
+                for stack in in-storage : ItemCount {
+                    items: stack;
+                }
+            }
+
+            Rectangle {
+                border-color: transparent;
+                border-width: 1px;
+                height: 5px;
+            }
+
+            VerticalLayout {
+                Header { text: "Steps:"; }
+
+                for recipe in steps : VerticalLayout {
+                    alignment: start;
+                    Hr { }
+                    RecipeBox {
+                        result: recipe.result;
+                        method: recipe.method;
+                        ingredients: recipe.ingredients;
+                    }
                 }
             }
         }

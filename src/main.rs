@@ -83,21 +83,35 @@ mod gui {
             state: rc::Weak<RwLock<State>>,
         ) -> Result<Self, slint::PlatformError> {
             fn reinitialize_ui(this: Weak<MainWindow>, state: rc::Weak<RwLock<State>>) {
+                fn extract_stacks<'recipes>(
+                    recipes: impl Iterator<Item = (&'recipes crate::Recipe, usize)>,
+                    mut predicate: impl FnMut(&'recipes crate::Recipe) -> bool,
+                ) -> (Vec<ItemStack>, Vec<(&'recipes crate::Recipe, usize)>) {
+                    let (extracted, remaining) = recipes
+                        .into_iter()
+                        .partition::<Vec<_>, _>(|(recipe, _)| predicate(recipe));
+                    (
+                        extracted
+                            .into_iter()
+                            .map(|(recipe, mult)| recipe.result() * mult)
+                            .map(ItemStack::from)
+                            .collect(),
+                        remaining,
+                    )
+                }
                 let state = state.upgrade().unwrap();
                 let state = state.read().unwrap();
                 let result = state.calculator.target();
                 let this = this.unwrap();
                 this.set_result(result.into());
-                let (raw_materials, recipes) = state
-                    .calculator
-                    .steps()
-                    .partition::<Vec<_>, _>(|(recipe, _)| recipe.method() == "Raw Material");
-                let raw_materials = raw_materials
-                    .into_iter()
-                    .map(|(recipe, mult)| recipe.result() * mult)
-                    .map(ItemStack::from)
-                    .collect::<Vec<_>>();
+                let (raw_materials, recipes) = extract_stacks(state.calculator.steps(), |recipe| {
+                    recipe.method() == "Raw Material"
+                });
                 this.set_raw_materials(mk_vec_model_rc(raw_materials));
+                let (in_storage, recipes) = extract_stacks(recipes.into_iter(), |recipe| {
+                    recipe.method() == "In Storage"
+                });
+                this.set_in_storage(mk_vec_model_rc(in_storage));
                 let steps = recipes
                     .into_iter()
                     .map(calculator_step_to_recipe)
