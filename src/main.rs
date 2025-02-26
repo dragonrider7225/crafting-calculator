@@ -82,7 +82,7 @@ mod gui {
         pub(crate) fn real_new(
             state: rc::Weak<RwLock<State>>,
         ) -> Result<Self, slint::PlatformError> {
-            fn reinitialize_ui(this: Weak<MainWindow>, state: rc::Weak<RwLock<State>>) {
+            fn reinitialize_ui(this: &MainWindow, state: &State) {
                 fn extract_stacks<'recipes>(
                     recipes: impl Iterator<Item = (&'recipes crate::Recipe, usize)>,
                     mut predicate: impl FnMut(&'recipes crate::Recipe) -> bool,
@@ -99,10 +99,7 @@ mod gui {
                         remaining,
                     )
                 }
-                let state = state.upgrade().unwrap();
-                let state = state.read().unwrap();
                 let result = state.calculator.target();
-                let this = this.unwrap();
                 this.set_result(result.into());
                 let (raw_materials, recipes) = extract_stacks(state.calculator.steps(), |recipe| {
                     recipe.method() == "Raw Material"
@@ -131,14 +128,9 @@ mod gui {
             let this_weak = this.as_weak();
             let weak_state = state.clone();
             this.on_set_target(move |target| {
-                weak_state
-                    .upgrade()
-                    .unwrap()
-                    .write()
-                    .unwrap()
-                    .calculator
-                    .set_target(target.into());
-                reinitialize_ui(this_weak.clone(), weak_state.clone());
+                let state = weak_state.upgrade().unwrap();
+                state.write().unwrap().calculator.set_target(target.into());
+                reinitialize_ui(&this_weak.unwrap(), &state.read().unwrap());
             });
             let this_weak = this.as_weak();
             this.on_craft_clicked(move || {
@@ -150,32 +142,22 @@ mod gui {
             let this_weak = this.as_weak();
             let weak_state = state.clone();
             this.on_craft(move |stack| {
+                let state = weak_state.upgrade().unwrap();
                 // Force the write guard to be released immediately, since it seems to have been
                 // held for the entirety of the match expression, resulting in a deadlock when
                 // getting the steps.
-                let result = weak_state
-                    .upgrade()
-                    .unwrap()
+                let result = state
                     .write()
                     .unwrap()
                     .calculator
                     .perform_craft(&stack.into());
                 match result {
-                    Ok(()) => this_weak.unwrap().set_steps(mk_vec_model_rc(
-                        weak_state
-                            .upgrade()
-                            .unwrap()
-                            .read()
-                            .unwrap()
-                            .calculator
-                            .steps()
-                            .map(calculator_step_to_recipe)
-                            .collect(),
-                    )),
+                    Ok(()) => reinitialize_ui(&this_weak.unwrap(), &state.read().unwrap()),
                     Err(e) => show_error(&format!("{e}")),
                 }
             });
 
+            let this_weak = this.as_weak();
             let weak_state = state.clone();
             this.on_load_recipes_clicked(move || {
                 if let Some(filename) = FileDialog::new()
@@ -187,12 +169,14 @@ mod gui {
                         show_error("Cannot open file with non-UTF-8 path");
                         return;
                     };
-                    if let Err(e) = crate::read_recipes(
-                        filename,
-                        &mut weak_state.upgrade().unwrap().write().unwrap(),
-                    ) {
+                    let state = weak_state.upgrade().unwrap();
+                    // `res` moved out of if-statement due to deadlock with `reinitialize_ui`.
+                    let res = crate::read_recipes(filename, &mut state.write().unwrap());
+                    if let Err(e) = res {
                         show_error(&format!("Couldn't read recipes from {filename:?}: {e:?}"));
-                    };
+                    } else {
+                        reinitialize_ui(&this_weak.unwrap(), &state.read().unwrap());
+                    }
                 }
             });
             let weak_state = state.clone();
@@ -234,14 +218,13 @@ mod gui {
             let this_weak = this.as_weak();
             let weak_state = state.clone();
             this.on_add_recipe(move |recipe| {
-                weak_state
-                    .upgrade()
-                    .unwrap()
+                let state = weak_state.upgrade().unwrap();
+                state
                     .write()
                     .unwrap()
                     .calculator
                     .add_recipes(vec![recipe.into()]);
-                reinitialize_ui(this_weak.clone(), weak_state.clone())
+                reinitialize_ui(&this_weak.unwrap(), &state.read().unwrap());
             });
             let weak_state = state.clone();
             this.on_show_recipes_clicked(move || {
@@ -261,14 +244,9 @@ mod gui {
             let this_weak = this.as_weak();
             let weak_state = state.clone();
             this.on_add_resource(move |stack| {
-                weak_state
-                    .upgrade()
-                    .unwrap()
-                    .write()
-                    .unwrap()
-                    .calculator
-                    .add_resource(stack.into());
-                reinitialize_ui(this_weak.clone(), weak_state.clone())
+                let state = weak_state.upgrade().unwrap();
+                state.write().unwrap().calculator.add_resource(stack.into());
+                reinitialize_ui(&this_weak.unwrap(), &state.read().unwrap());
             });
             let this_weak = this.as_weak();
             this.on_remove_resource_clicked(move || {
@@ -280,14 +258,13 @@ mod gui {
             let this_weak = this.as_weak();
             let weak_state = state.clone();
             this.on_remove_resource(move |stack| {
-                weak_state
-                    .upgrade()
-                    .unwrap()
+                let state = weak_state.upgrade().unwrap();
+                state
                     .write()
                     .unwrap()
                     .calculator
                     .remove_resource(stack.into());
-                reinitialize_ui(this_weak.clone(), weak_state.clone())
+                reinitialize_ui(&this_weak.unwrap(), &state.read().unwrap());
             });
             let weak_state = state.clone();
             this.on_show_resources_clicked(move || {
@@ -306,6 +283,7 @@ mod gui {
                     .unwrap()
             });
 
+            let this_weak = this.as_weak();
             let weak_state = state.clone();
             this.on_load_resources_clicked(move || {
                 if let Some(filename) = FileDialog::new()
@@ -320,11 +298,12 @@ mod gui {
                         }
                         Some(filename) => filename,
                     };
-                    if let Err(e) = crate::read_resources(
-                        filename,
-                        &mut weak_state.upgrade().unwrap().write().unwrap(),
-                    ) {
+                    let state = weak_state.upgrade().unwrap();
+                    let res = crate::read_resources(filename, &mut state.write().unwrap());
+                    if let Err(e) = res {
                         eprintln!("Couldn't read resources from {filename:?}: {e:?}")
+                    } else {
+                        reinitialize_ui(&this_weak.unwrap(), &state.read().unwrap());
                     };
                 }
             });
@@ -357,7 +336,7 @@ mod gui {
                     );
                 }
             });
-            reinitialize_ui(this.as_weak(), state);
+            reinitialize_ui(&this, &state.upgrade().unwrap().read().unwrap());
             Ok(this)
         }
     }
