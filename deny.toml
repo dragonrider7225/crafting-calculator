@@ -83,6 +83,7 @@ ignore = [
     { id = "RUSTSEC-2024-0419", reason = "gtk dependency comes through slint via muda but slint only depends on muda on Windows and MacOS whereas muda only depends on gtk on Linux" },
     { id = "RUSTSEC-2024-0420", reason = "gtk dependency comes through slint via muda but slint only depends on muda on Windows and MacOS whereas muda only depends on gtk on Linux" },
     { id = "RUSTSEC-2024-0429", reason = "glib is only brought in by gtk, which is never actually a dependency" },
+    { id = "RUSTSEC-2024-0436", reason = "paste is a transitive dependency of slint, which is core to the GUI functionality" },
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.
