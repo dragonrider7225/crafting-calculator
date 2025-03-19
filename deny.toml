@@ -98,6 +98,7 @@ allow = [
     "ISC",
     "MPL-2.0",
     "MIT",
+    "NCSA",
     "Unicode-DFS-2016",
     "Unicode-3.0",
     "Zlib",
