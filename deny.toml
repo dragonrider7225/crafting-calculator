@@ -74,6 +74,16 @@ ignore = [
     #{ id = "RUSTSEC-0000-0000", reason = "you can specify a reason the advisory is ignored" },
     #"a-crate-that-is-yanked@0.1.1", # you can also ignore yanked crate versions if you wish
     #{ crate = "a-crate-that-is-yanked@0.1.1", reason = "you can specify why you are ignoring the yanked crate" },
+    { id = "RUSTSEC-2024-0370", reason = "proc-macro-error is only brought in by gtk, which is never actually a dependency" },
+    { id = "RUSTSEC-2024-0412", reason = "gtk dependency comes through slint via muda but slint only depends on muda on Windows and MacOS whereas muda only depends on gtk on Linux" },
+    { id = "RUSTSEC-2024-0413", reason = "gtk dependency comes through slint via muda but slint only depends on muda on Windows and MacOS whereas muda only depends on gtk on Linux" },
+    { id = "RUSTSEC-2024-0415", reason = "gtk dependency comes through slint via muda but slint only depends on muda on Windows and MacOS whereas muda only depends on gtk on Linux" },
+    { id = "RUSTSEC-2024-0416", reason = "gtk dependency comes through slint via muda but slint only depends on muda on Windows and MacOS whereas muda only depends on gtk on Linux" },
+    { id = "RUSTSEC-2024-0418", reason = "gtk dependency comes through slint via muda but slint only depends on muda on Windows and MacOS whereas muda only depends on gtk on Linux" },
+    { id = "RUSTSEC-2024-0419", reason = "gtk dependency comes through slint via muda but slint only depends on muda on Windows and MacOS whereas muda only depends on gtk on Linux" },
+    { id = "RUSTSEC-2024-0420", reason = "gtk dependency comes through slint via muda but slint only depends on muda on Windows and MacOS whereas muda only depends on gtk on Linux" },
+    { id = "RUSTSEC-2024-0429", reason = "glib is only brought in by gtk, which is never actually a dependency" },
+    { id = "RUSTSEC-2024-0436", reason = "paste is a transitive dependency of slint, which is core to the GUI functionality" },
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.
@@ -98,6 +108,7 @@ allow = [
     "ISC",
     "MPL-2.0",
     "MIT",
+    "NCSA",
     "Unicode-DFS-2016",
     "Unicode-3.0",
     "Zlib",

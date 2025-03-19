@@ -6,6 +6,7 @@
 #![cfg_attr(not(debug_assertions), deny(clippy::todo))]
 
 use std::{
+    borrow::{Borrow, Cow},
     fs::{self, OpenOptions},
     io::{self, Write as IoWrite},
     rc::Rc,
@@ -27,7 +28,7 @@ mod gui {
     use rfd::FileDialog;
     use slint::{Model as _, ModelRc, SharedString, StandardListViewItem, VecModel, Weak};
 
-    use crate::{ResourceModifier, State};
+    use crate::{Matcher, ResourceModifier, State};
 
     slint::include_modules!();
 
@@ -415,26 +416,16 @@ mod gui {
             this.on_close_clicked(move || this_weak.unwrap().hide().unwrap());
             let this_weak = this.as_weak();
             this.on_search_edited(move |search_text| {
-                use slint::SharedString as SString;
-
                 let this = this_weak.unwrap();
-                let search_text: &str = &search_text;
-                let case_insensitive = search_text.chars().all(|c| c.is_lowercase());
-                let matches_case_sensitive = |s: &SString| s.contains(search_text);
-                let matches = |s: &SString| s.to_lowercase().contains(search_text);
+                let matcher = Matcher::from(&*search_text);
                 let visible_recipes = recipes
                     .iter()
                     .filter(|recipe| {
-                        let matcher: &dyn Fn(&'_ _) -> _ = if case_insensitive {
-                            &matches as &_
-                        } else {
-                            &matches_case_sensitive as &_
-                        };
-                        matcher(&recipe.result.name)
+                        matcher.matches(&recipe.result.name)
                             || recipe
                                 .ingredients
                                 .iter()
-                                .any(|ingredient| matcher(&ingredient.name))
+                                .any(|ingredient| matcher.matches(&ingredient.name))
                     })
                     .cloned()
                     .collect();
@@ -499,17 +490,10 @@ mod gui {
             let this_weak = this.as_weak();
             this.on_search_edited(move |search_text| {
                 let this = this_weak.unwrap();
-                let search_text: &str = &search_text;
-                let case_insensitive = search_text.chars().all(char::is_lowercase);
+                let matcher = Matcher::from(&*search_text);
                 let visible_resources = resources
                     .iter()
-                    .filter(|&resource| {
-                        if case_insensitive {
-                            resource.name.to_lowercase().contains(search_text)
-                        } else {
-                            resource.name.contains(search_text)
-                        }
-                    })
+                    .filter(|&resource| matcher.matches(&resource.name))
                     .map(convert_resource)
                     .collect();
                 this.set_resources(mk_vec_model_rc(visible_resources));
@@ -1127,6 +1111,33 @@ const COMMANDS: &[(&str, &dyn Action)] = &[
     ("target", &Target),
     ("write", &Write),
 ];
+
+/// A string predicate.
+enum Matcher<'query> {
+    /// Some part of the string exactly matches the query.
+    CaseSensitive(&'query str),
+    /// Some part of the string matches the query ignoring case.
+    CaseInsensitive(Cow<'query, str>),
+}
+
+impl Matcher<'_> {
+    fn matches(&self, s: &str) -> bool {
+        match self {
+            Self::CaseSensitive(query) => s.contains(query),
+            Self::CaseInsensitive(query) => s.to_lowercase().contains::<&str>(query.borrow()),
+        }
+    }
+}
+
+impl<'query> From<&'query str> for Matcher<'query> {
+    fn from(query: &'query str) -> Self {
+        if query.chars().any(|c| c.is_uppercase()) {
+            Self::CaseSensitive(query)
+        } else {
+            Self::CaseInsensitive(Cow::Borrowed(query))
+        }
+    }
+}
 
 fn cli(mut state: State) -> io::Result<()> {
     loop {
