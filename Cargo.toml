@@ -9,7 +9,7 @@ build = "build.rs"
 [dependencies]
 clap = { version = "^4.5.19", features = ["derive", "wrap_help"] }
 nom = "^8.0.0"
-priority-queue = "^2.1.1"
+priority-queue = "^2.3.1"
 rfd = "^0.15.3"
 slint = "^1.10.0"
 
