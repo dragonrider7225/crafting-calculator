@@ -558,6 +558,7 @@ mod gui {
             Self::new(
                 value.result.into(),
                 value.method,
+                vec![],
                 value.ingredients.iter().map(Stack::from).collect(),
             )
         }
@@ -947,7 +948,7 @@ impl Action for NewRecipe {
                 }
             }
         }
-        let recipe = Recipe::new(result, method, ingredients);
+        let recipe = Recipe::new(result, method, vec![], ingredients);
         state.calculator.set_recipe(recipe);
     }
 

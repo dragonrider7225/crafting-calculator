@@ -134,6 +134,7 @@ impl Calculator {
                             Rc::new(Recipe::new(
                                 Stack::new(next_craft, 1),
                                 "In Storage",
+                                vec![],
                                 vec![Stack::new(next_craft, 1)],
                             )),
                             retrieved,
@@ -179,6 +180,7 @@ impl Calculator {
                             Rc::new(Recipe::new(
                                 Stack::new(next_craft, 1),
                                 "Raw Material",
+                                vec![],
                                 vec![Stack::new(next_craft, 1)],
                             )),
                             count,
