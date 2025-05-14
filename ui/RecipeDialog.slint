@@ -5,8 +5,10 @@ export component RecipeDialog inherits Dialog {
     out property <string> result_name <=> res_name.text;
     out property <int> result_count <=> res_count.value;
     out property <string> method <=> m.text;
+    in-out property <[ItemStack]> catalysts: [];
     in-out property <[ItemStack]> ingredients: [{ name: "", count: 0 }];
 
+    callback add_catalyst();
     callback add_ingredient();
     callback cancel_clicked <=> cancel-btn.clicked;
     callback ok_clicked <=> ok-btn.clicked;
@@ -41,13 +43,46 @@ export component RecipeDialog inherits Dialog {
                     accepted => { root.ok_clicked(); }
                 }
             }
+            for catalyst[i] in catalysts : FocusScope {
+                HorizontalBox {
+                    Text {
+                        text: "Catalyst: ";
+                        vertical-alignment: center;
+                    }
+                    catalyst_name := LineEdit {
+                        text: catalyst.name;
+                        enabled: true;
+                        edited(s) => { root.catalysts[i].name = s; }
+                        accepted => {
+                            self.edited(self.text);
+                            root.ok_clicked();
+                        }
+                    }
+                    catalyst_count := SpinBox {
+                        value: catalyst.count;
+                        enabled: true;
+                        minimum: 1;
+                        maximum: 2147483647;
+                        edited(n) => { root.catalysts[i].count = n; }
+                        horizontal-stretch: 0;
+                    }
+                }
+                focus-changed-event => {
+                    catalyst_name.edited(catalyst_name.text);
+                    catalyst_count.edited(catalyst_count.value);
+                }
+            }
+            Button {
+                text: "Add Catalyst";
+                clicked => { root.add-catalyst(); }
+            }
             for ingredient[i] in ingredients : FocusScope {
                 HorizontalBox {
                     Text {
                         text: "Ingredient: ";
                         vertical-alignment: center;
                     }
-                    name := LineEdit {
+                    ingredient_name := LineEdit {
                         text: ingredient.name;
                         enabled: true;
                         edited(s) => { root.ingredients[i].name = s; }
@@ -56,7 +91,7 @@ export component RecipeDialog inherits Dialog {
                             root.ok_clicked();
                         }
                     }
-                    count := SpinBox {
+                    ingredient_count := SpinBox {
                         value: ingredient.count;
                         enabled: true;
                         minimum: 1;
@@ -66,12 +101,12 @@ export component RecipeDialog inherits Dialog {
                     }
                 }
                 focus-changed-event => {
-                    name.edited(name.text);
-                    count.edited(count.value);
+                    ingredient_name.edited(ingredient_name.text);
+                    ingredient_count.edited(ingredient_count.value);
                 }
             }
             Button {
-                text: "+";
+                text: "Add Ingredient";
                 clicked => { root.add-ingredient(); }
             }
             Text { vertical-stretch: 1; }

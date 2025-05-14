@@ -8,12 +8,13 @@ use nom::{
     bytes::complete as bytes, character::complete as character, combinator as comb, multi,
     sequence, IResult, Parser as _,
 };
+use serde::{Deserialize, Serialize};
 
 /// The number of items in a stack.
 pub type Count = usize;
 
 /// A stack of some number of all the same item.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub struct Stack {
     name: String,
     count: Count,

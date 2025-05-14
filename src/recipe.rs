@@ -4,24 +4,34 @@ use nom::{
     branch, bytes::complete as bytes, character::complete as character, combinator, multi,
     sequence, IResult, Parser,
 };
+use serde::{Deserialize, Serialize};
 
 use crate::Stack;
 
 /// A known way to produce a stack from a set of other stacks.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub struct Recipe {
     result: Stack,
     method: String,
+    catalysts: Vec<Stack>,
     ingredients: Vec<Stack>,
 }
 
 impl Recipe {
     /// Creates a new recipe representing the ability to convert `ingredients` into `result` using
-    /// `method`.
-    pub fn new(result: Stack, method: impl Into<String>, ingredients: Vec<Stack>) -> Self {
+    /// `method` and `catalysts`. A catalyst is an ingredient that is not consumed by the recipe.
+    /// Alternatively, the catalysts are consumed by the recipe but an equal amount of each
+    /// catalyst is produced as a side-effect.
+    pub fn new(
+        result: Stack,
+        method: impl Into<String>,
+        catalysts: Vec<Stack>,
+        ingredients: Vec<Stack>,
+    ) -> Self {
         Self {
             result,
             method: method.into(),
+            catalysts,
             ingredients,
         }
     }
@@ -36,6 +46,12 @@ impl Recipe {
     /// The method by which the ingredients are turned into the result.
     pub fn method(&self) -> &str {
         &self.method
+    }
+
+    /// The items that must be present to execute this recipe but are not required in greater
+    /// numbers when executing this recipe multiple times.
+    pub fn catalysts(&self) -> impl Iterator<Item = &'_ Stack> {
+        self.catalysts.iter()
     }
 
     /// The stacks that are required to execute this recipe once.
@@ -124,6 +140,7 @@ where
             |((result, method), ingredients)| Recipe {
                 result,
                 method: method.unwrap_or(self.default_method).to_string(),
+                catalysts: vec![],
                 ingredients,
             },
         )
@@ -161,6 +178,7 @@ where
             |((result, method), ingredients)| Recipe {
                 result,
                 method: method.unwrap_or(self.default_method).to_string(),
+                catalysts: vec![],
                 ingredients,
             },
         )
@@ -204,6 +222,7 @@ mod tests {
             Recipe {
                 result: Stack::new("Oak Wood Planks", 4),
                 method: "Crafting Table".to_string(),
+                catalysts: vec![],
                 ingredients: vec![Stack::new("Oak Log", 1)],
             },
         );
@@ -220,6 +239,7 @@ mod tests {
             Recipe {
                 result: Stack::new("Charcoal", 1),
                 method: "Furnace".to_string(),
+                catalysts: vec![],
                 ingredients: vec![Stack::new("Oak Log", 1)],
             },
         );
@@ -236,6 +256,7 @@ mod tests {
             Recipe {
                 result: Stack::new("Wooden Shovel", 1),
                 method: "Crafting Table".to_string(),
+                catalysts: vec![],
                 ingredients: vec![Stack::new("Oak Wood Planks", 1), Stack::new("Stick", 2)],
             },
         );

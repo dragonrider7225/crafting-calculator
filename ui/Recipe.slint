@@ -8,6 +8,7 @@ export struct ItemStack {
 export struct Recipe {
     result: ItemStack,
     method: string,
+    catalysts: [ItemStack],
     ingredients: [ItemStack],
 }
 
@@ -26,6 +27,7 @@ export component ItemCount inherits HorizontalLayout {
 export component RecipeBox inherits VerticalLayout {
     in property <ItemStack> result;
     in property <string> method;
+    in property <[ItemStack]> catalysts;
     in property <[ItemStack]> ingredients;
 
     alignment: start;
@@ -41,8 +43,24 @@ export component RecipeBox inherits VerticalLayout {
             text: " (\{root.method})";
         }
     }
+    if 0 < catalysts.length : VerticalLayout {
+        HorizontalLayout {
+            alignment: start;
+            padding-left: (1 + 1) * 5px;
+            Text { text: "Catalysts:"; }
+        }
+        for catalyst in catalysts : ItemCount {
+            indent-level: 2;
+            items: catalyst;
+        }
+    }
+    HorizontalLayout {
+        alignment: start;
+        padding-left: (1 + 1) * 5px;
+        Text { text: "Ingredients:"; }
+    }
     for ingredient in ingredients : ItemCount {
-        indent-level: 1;
+        indent-level: 2;
         items: ingredient;
     }
 }

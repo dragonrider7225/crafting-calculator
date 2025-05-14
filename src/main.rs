@@ -13,9 +13,9 @@ use std::{
     sync::RwLock,
 };
 
-use nom::Parser as _;
-
 use clap::Parser;
+use nom::Parser as _;
+use serde::{Deserialize, Serialize};
 
 use crafting_calculator::{Calculator, Recipe, Stack};
 
@@ -162,7 +162,8 @@ mod gui {
             let weak_state = state.clone();
             this.on_load_recipes_clicked(move || {
                 if let Some(filename) = FileDialog::new()
-                    .add_filter("Recipe list", &["lst", "recipes"])
+                    .add_filter("Recipe list v1", &["ron", "recipes"])
+                    .add_filter("Recipe list v0", &["lst", "recipes"])
                     .set_directory(std::env::current_dir().unwrap_or_else(|_| ".".into()))
                     .pick_file()
                 {
@@ -183,7 +184,7 @@ mod gui {
             let weak_state = state.clone();
             this.on_save_recipes_clicked(move || {
                 if let Some(filename) = FileDialog::new()
-                    .add_filter("Recipe list", &["lst"])
+                    .add_filter("Recipe list v1", &["ron", "recipes"])
                     .set_directory(std::env::current_dir().unwrap_or_else(|_| ".".into()))
                     .save_file()
                 {
@@ -203,10 +204,14 @@ mod gui {
                     else {
                         return;
                     };
-                    crate::write_recipes(
+                    if let Err(e) = crate::save_recipes(
                         &mut out,
-                        &mut weak_state.upgrade().unwrap().write().unwrap().calculator,
-                    );
+                        &weak_state.upgrade().unwrap().read().unwrap().calculator,
+                    ) {
+                        let msg = format!("{e:?}");
+                        eprintln!("{msg}");
+                        show_error(&msg);
+                    }
                 }
             });
             let this_weak = this.as_weak();
@@ -331,7 +336,7 @@ mod gui {
                     else {
                         return;
                     };
-                    crate::write_resources(
+                    crate::show_resources(
                         &mut out,
                         &mut weak_state.upgrade().unwrap().write().unwrap().calculator,
                     );
@@ -350,6 +355,20 @@ mod gui {
             let this_weak = this.as_weak();
             this.on_cancel_clicked(move || this_weak.unwrap().hide().unwrap());
             let this_weak = this.as_weak();
+            this.on_add_catalyst(move || {
+                let this = this_weak.unwrap();
+                let catalysts = VecModel::from(
+                    this.get_catalysts()
+                        .iter()
+                        .chain([ItemStack {
+                            name: SharedString::from(""),
+                            count: 0,
+                        }])
+                        .collect::<Vec<_>>(),
+                );
+                this.set_catalysts(ModelRc::new(catalysts));
+            });
+            let this_weak = this.as_weak();
             this.on_add_ingredient(move || {
                 let this = this_weak.unwrap();
                 let ingredients = VecModel::from(
@@ -366,6 +385,11 @@ mod gui {
             let this_weak = this.as_weak();
             this.on_ok_clicked(move || {
                 let this = this_weak.unwrap();
+                let catalysts = this
+                    .get_catalysts()
+                    .iter()
+                    .filter(|catalyst| !catalyst.name.trim().is_empty() && catalyst.count > 0)
+                    .collect::<Vec<_>>();
                 let ingredients = this
                     .get_ingredients()
                     .iter()
@@ -386,6 +410,7 @@ mod gui {
                 main_window.unwrap().invoke_add_recipe(Recipe {
                     ingredients: mk_vec_model_rc(ingredients),
                     method: this.get_method(),
+                    catalysts: mk_vec_model_rc(catalysts),
                     result: ItemStack {
                         name: this.get_result_name(),
                         count: this.get_result_count(),
@@ -543,6 +568,7 @@ mod gui {
                     value.ingredients().iter().map(ItemStack::from).collect(),
                 ),
                 method: value.method().into(),
+                catalysts: mk_vec_model_rc(value.catalysts().map(ItemStack::from).collect()),
                 result: value.result().into(),
             }
         }
@@ -553,6 +579,7 @@ mod gui {
             Self::new(
                 value.result.into(),
                 value.method,
+                value.catalysts.iter().map(Stack::from).collect(),
                 value.ingredients.iter().map(Stack::from).collect(),
             )
         }
@@ -611,6 +638,7 @@ mod gui {
     fn calculator_step_to_recipe((r, c): (&crate::Recipe, usize)) -> Recipe {
         let result = r.result();
         let method = r.method();
+        let catalysts = r.catalysts();
         let ingredients = r.ingredients();
         Recipe {
             result: ItemStack {
@@ -618,6 +646,7 @@ mod gui {
                 count: (result.count() * c) as _,
             },
             method: method.into(),
+            catalysts: mk_vec_model_rc(catalysts.map(ItemStack::from).collect()),
             ingredients: mk_vec_model_rc(
                 ingredients
                     .iter()
@@ -742,14 +771,35 @@ impl Action for Help {
     }
 }
 
+#[derive(Deserialize, Serialize)]
+enum Recipes {
+    V1(Vec<Recipe>),
+}
+
+impl Recipes {
+    fn unwrap(self) -> Vec<Recipe> {
+        match self {
+            Self::V1(recipes) => recipes,
+        }
+    }
+}
+
 fn read_recipes(filename: &str, state: &mut State) -> io::Result<()> {
     let s = fs::read_to_string(filename)?;
-    let (junk, recipes) = Recipe::parse_recipes("Crafting Table")
-        .parse(&s)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("{e:?}")))?;
-    if !junk.is_empty() {
-        eprintln!("Found junk data {junk:?} at the end of the recipe file");
-    }
+    let recipes = match ron::from_str::<Recipes>(&s) {
+        Ok(recipes) => recipes.unwrap(),
+        Err(e) => {
+            eprintln!("Couldn't parse recipes as RON: {e:?}");
+            eprintln!("Trying v0 representation");
+            let (junk, recipes) = Recipe::parse_recipes("Crafting Table")
+                .parse(&s)
+                .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("{e:?}")))?;
+            if !junk.is_empty() {
+                eprintln!("Found junk data {junk:?} at the end of the recipe file");
+            }
+            recipes
+        }
+    };
     state.calculator.add_recipes(recipes);
     Ok(())
 }
@@ -796,7 +846,7 @@ impl Action for Load {
     }
 }
 
-fn write_steps(out: &mut dyn IoWrite, calculator: &mut Calculator) {
+fn show_steps(out: &mut dyn IoWrite, calculator: &mut Calculator) {
     for (recipe, count) in calculator.steps() {
         match writeln!(out, "{recipe:.count$}") {
             Ok(_) => {}
@@ -808,7 +858,7 @@ fn write_steps(out: &mut dyn IoWrite, calculator: &mut Calculator) {
     }
 }
 
-fn write_resources(out: &mut dyn IoWrite, calculator: &mut Calculator) {
+fn show_resources(out: &mut dyn IoWrite, calculator: &mut Calculator) {
     for stack in calculator.resources() {
         match writeln!(out, "{}", stack) {
             Ok(_) => {}
@@ -820,7 +870,7 @@ fn write_resources(out: &mut dyn IoWrite, calculator: &mut Calculator) {
     }
 }
 
-fn write_recipes(out: &mut dyn IoWrite, calculator: &mut Calculator) {
+fn show_recipes(out: &mut dyn IoWrite, calculator: &Calculator) {
     let mut first_recipe = true;
     for recipe in calculator.recipes() {
         if !first_recipe {
@@ -844,14 +894,21 @@ fn write_recipes(out: &mut dyn IoWrite, calculator: &mut Calculator) {
     }
 }
 
+fn save_recipes(out: &mut dyn IoWrite, calculator: &Calculator) -> io::Result<()> {
+    let recipes = calculator.recipes().cloned().collect();
+    let s = ron::ser::to_string(&Recipes::V1(recipes))
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    out.write_all(s.as_bytes())
+}
+
 struct Print;
 
 impl Action for Print {
     fn apply(&self, arguments: &str, state: &mut State) {
         match arguments {
-            "steps" | "" => write_steps(&mut io::stdout().lock(), &mut state.calculator),
-            "resources" => write_resources(&mut io::stdout().lock(), &mut state.calculator),
-            "recipes" => write_recipes(&mut io::stdout().lock(), &mut state.calculator),
+            "steps" | "" => show_steps(&mut io::stdout().lock(), &mut state.calculator),
+            "resources" => show_resources(&mut io::stdout().lock(), &mut state.calculator),
+            "recipes" => show_recipes(&mut io::stdout().lock(), &state.calculator),
             _ => println!("Unknown `what`: {arguments:?}"),
         }
     }
@@ -914,7 +971,7 @@ impl Action for NewRecipe {
                 }
             }
         }
-        let recipe = Recipe::new(result, method, ingredients);
+        let recipe = Recipe::new(result, method, vec![], ingredients);
         state.calculator.set_recipe(recipe);
     }
 
@@ -1068,19 +1125,14 @@ impl Action for Write {
             }
         };
         match what {
-            "steps" => write_steps(&mut f, &mut state.calculator),
-            "resources" => write_resources(&mut f, &mut state.calculator),
-            "recipes" => write_recipes(&mut f, &mut state.calculator),
-            _ => {
-                let mut f = match open_file(arguments.trim()) {
-                    Ok(f) => f,
-                    Err(e) => {
-                        eprintln!("Couldn't open file: {e:?}");
-                        return;
-                    }
-                };
-                write_recipes(&mut f, &mut state.calculator);
+            "steps" => show_steps(&mut f, &mut state.calculator),
+            "resources" => show_resources(&mut f, &mut state.calculator),
+            "recipes" => {
+                if let Err(e) = save_recipes(&mut f, &state.calculator) {
+                    eprintln!("{e:?}");
+                }
             }
+            _ => eprintln!("Can't write unknown item type {what:?}"),
         }
     }
 
