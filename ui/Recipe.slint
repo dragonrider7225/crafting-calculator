@@ -8,6 +8,7 @@ export struct ItemStack {
 export struct Recipe {
     result: ItemStack,
     method: string,
+    catalysts: [ItemStack],
     ingredients: [ItemStack],
 }
 

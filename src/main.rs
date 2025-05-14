@@ -548,6 +548,7 @@ mod gui {
                     value.ingredients().iter().map(ItemStack::from).collect(),
                 ),
                 method: value.method().into(),
+                catalysts: mk_vec_model_rc(value.catalysts().map(ItemStack::from).collect()),
                 result: value.result().into(),
             }
         }
@@ -558,7 +559,7 @@ mod gui {
             Self::new(
                 value.result.into(),
                 value.method,
-                vec![],
+                value.catalysts.iter().map(Stack::from).collect(),
                 value.ingredients.iter().map(Stack::from).collect(),
             )
         }
@@ -617,6 +618,7 @@ mod gui {
     fn calculator_step_to_recipe((r, c): (&crate::Recipe, usize)) -> Recipe {
         let result = r.result();
         let method = r.method();
+        let catalysts = r.catalysts();
         let ingredients = r.ingredients();
         Recipe {
             result: ItemStack {
@@ -624,6 +626,7 @@ mod gui {
                 count: (result.count() * c) as _,
             },
             method: method.into(),
+            catalysts: mk_vec_model_rc(catalysts.map(ItemStack::from).collect()),
             ingredients: mk_vec_model_rc(
                 ingredients
                     .iter()
