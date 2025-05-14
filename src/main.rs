@@ -355,6 +355,20 @@ mod gui {
             let this_weak = this.as_weak();
             this.on_cancel_clicked(move || this_weak.unwrap().hide().unwrap());
             let this_weak = this.as_weak();
+            this.on_add_catalyst(move || {
+                let this = this_weak.unwrap();
+                let catalysts = VecModel::from(
+                    this.get_catalysts()
+                        .iter()
+                        .chain([ItemStack {
+                            name: SharedString::from(""),
+                            count: 0,
+                        }])
+                        .collect::<Vec<_>>(),
+                );
+                this.set_catalysts(ModelRc::new(catalysts));
+            });
+            let this_weak = this.as_weak();
             this.on_add_ingredient(move || {
                 let this = this_weak.unwrap();
                 let ingredients = VecModel::from(
@@ -371,6 +385,11 @@ mod gui {
             let this_weak = this.as_weak();
             this.on_ok_clicked(move || {
                 let this = this_weak.unwrap();
+                let catalysts = this
+                    .get_catalysts()
+                    .iter()
+                    .filter(|catalyst| !catalyst.name.trim().is_empty() && catalyst.count > 0)
+                    .collect::<Vec<_>>();
                 let ingredients = this
                     .get_ingredients()
                     .iter()
@@ -391,6 +410,7 @@ mod gui {
                 main_window.unwrap().invoke_add_recipe(Recipe {
                     ingredients: mk_vec_model_rc(ingredients),
                     method: this.get_method(),
+                    catalysts: mk_vec_model_rc(catalysts),
                     result: ItemStack {
                         name: this.get_result_name(),
                         count: this.get_result_count(),
