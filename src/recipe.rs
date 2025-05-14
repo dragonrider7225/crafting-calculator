@@ -4,11 +4,12 @@ use nom::{
     branch, bytes::complete as bytes, character::complete as character, combinator, multi,
     sequence, IResult, Parser,
 };
+use serde::{Deserialize, Serialize};
 
 use crate::Stack;
 
 /// A known way to produce a stack from a set of other stacks.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub struct Recipe {
     result: Stack,
     method: String,
